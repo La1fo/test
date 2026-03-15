@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Профиль — Frendly Map</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+      background: url('/static/images/city-bg-full.png') center center / 101% auto no-repeat fixed;
+      background-color: #cbe6f7;
+    }
+
+    /* Навигация */
+    .top-nav {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 14px 30px;
+      border-radius: 50px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 100px;
+      width: 100%;
+      max-width: 700px;
+      margin-top: 40px;
+      z-index: 10;
+    }
+
+    .top-nav a {
+      padding: 8px 16px;
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: 600;
+      font-size: 1.25rem;
+      border-radius: 30px;
+      transition: all 0.2s ease;
+    }
+
+    .top-nav a:hover,
+    .top-nav a.active {
+      background: #2997f5;
+      color: white;
+      padding: 8px 20px;
+    }
+
+    /* Контейнер профиля */
+    .container {
+      max-width: 600px;
+      width: 100%;
+      padding: 40px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      text-align: left;
+    }
+
+    .profile-header {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .avatar {
+      width: 80px;
+      height: 80px;
+      background: #e3f2fd;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      color: #0077cc;
+      font-weight: bold;
+    }
+
+    .profile-info h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: #006699;
+      margin: 0 0 5px 0;
+    }
+
+    .profile-info p {
+      color: #666;
+      font-size: 1.1rem;
+      margin: 0 0 10px 0;
+    }
+
+    .rank {
+      display: inline-block;
+      background: #d4af37;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    /* Статистика — по центру */
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+
+    .stat {
+      text-align: center;
+      min-width: 120px;
+    }
+
+    .stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: #0077cc;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    /* Достижения — с прокруткой при >8 иконок */
+    .achievements {
+      margin-top: 30px;
+    }
+
+    .achievements h3 {
+      font-size: 1.2rem;
+      color: #006699;
+      margin-bottom: 15px;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    .icons {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      max-height: 180px; /* ~3 ряда */
+      overflow-y: auto;
+      padding-right: 8px;
+    }
+
+    .icon {
+      width: 60px;
+      height: 60px;
+      background: #e3f2fd;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      color: #0077cc;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 600px) {
+      .profile-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .avatar {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+      }
+
+      .stats {
+        justify-content: space-around;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Навигация -->
+  <nav class="top-nav">
+    <a href="/">Главная</a>
+    <a href="/achievements">Достижения</a>
+    <a href="/leaderboard">Топ</a>
+    <a href="/faq">Помощь</a>
+    <a href="/login">Вход</a>
+    <a href="/profile" class="active">Профиль</a>
+  </nav>
+
+  <!-- Профиль -->
+  <div class="container">
+    <div class="profile-header">
+      <div class="avatar">👤</div>
+      <div class="profile-info">
+        <h2>Анна Петрова</h2>
+        <p>@anna_petrova</p>
+        <div><span class="rank">Мастер-картограф</span></div>
+      </div>
+    </div>
+
+    <!-- Статистика — по центру -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Очки</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">0</div>
+        <div class="stat-label">Локаций</div>
+      </div>
+      <div class="stat">
+        <div class="stat-value">27</div>
+        <div class="stat-label">Достижений</div>
+      </div>
+    </div>
+
+    <!-- Достижения — с прокруткой -->
+    <div class="achievements">
+      <h3>Ваши достижения</h3>
+      <div class="icons">
+        <div class="icon">🏅</div>
+        <div class="icon">📸</div>
+        <div class="icon">🏙️</div>
+        <div class="icon">🌿</div>
+        <div class="icon">🌙</div>
+        <div class="icon">🏆</div>
+        <div class="icon">🔍</div>
+        <div class="icon">📍</div>
+        <div class="icon">🚶</div>
+        <div class="icon">🗺️</div>
+        <div class="icon">🧳</div>
+        <div class="icon">💡</div>
+      </div>
+    </div>
+
+    <p style="margin-top: 30px; color: #666; font-size: 0.9rem;">
+      Демонстрационный профиль. В реальном проекте данные загружаются из Telegram-бота.
+    </p>
+  </div>
+</body>
+</html>

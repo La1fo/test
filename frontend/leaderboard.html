@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ТОП пользователей — Frendly Map</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      background: url('/static/images/city-bg-full.png') center center / 102% auto no-repeat fixed;
+    }
+/* надо будет убрать!!!! */
+.nenado {
+  background: #fa0000
+}
+
+    /* Центральный контейнер */
+    .container {
+      max-width: 800px;
+      width: 100%;
+      padding: 40px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      z-index: 1;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      margin-bottom: 20px;
+      color: #006699;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    h2 {
+      text-align: center;
+      margin-top: 40px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #eee;
+      color: #222;
+      font-size: 1.5rem;
+    }
+
+    .leaderboard {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px auto;
+      background: white;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .leaderboard th,
+    .leaderboard td {
+      padding: 12px 10px;
+      text-align: center;
+      border-bottom: 1px solid #eee;
+    }
+
+    .leaderboard th {
+      background: #f5f9ff;
+      color: #0077cc;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .rank-num {
+      font-weight: bold;
+      color: #d4af37;
+      width: 30px;
+    }
+
+    .username {
+      font-weight: 500;
+      color: #0077cc;
+    }
+
+    .user-rank {
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: 4px;
+    }
+
+    .points, .locations {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .call-to-action {
+      text-align: center;
+      margin-top: 30px;
+      color: #777;
+    }
+
+    .call-to-action a {
+      color: #0077cc;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .call-to-action a:hover {
+      text-decoration: underline;
+    }
+
+
+    /* Навигация сверху */
+    .top-nav {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 14px 30px;
+      border-radius: 50px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 100px;
+      width: 100%;
+      max-width: 700px;
+      margin-top: 40px;
+      z-index: 10;
+    }
+
+    .top-nav a {
+      text-decoration: none;
+      color: #0077cc;
+      padding: 8px 16px;
+      border-radius: 30px; /* ← Увеличил радиус, чтобы было как на макете */
+      font-weight: 600;
+      font-size: 1.25rem; /* ← Слегка уменьшил шрифт для лучшего вида */
+      transition: all 0.3s ease; /* ← Добавил плавный переход */
+    }
+
+    .top-nav a.active {
+      background: #2997f5;
+      color: white;
+      padding: 8px 20px;
+    }
+
+    .top-nav a:hover:not(.active) {
+      background: #2997f5;
+      color: white;
+      padding: 8px 20px;
+    }
+    /* ========== ЧАТ — НЕ ТРОГАТЬ ========== */
+    .chat-widget {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .chat-button {
+      width: 60px;
+      height: 60px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .chat-window {
+      width: 320px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      position: absolute;
+      bottom: 70px;
+      right: 0;
+      display: none;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: #2997f5;
+      color: white;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      font-weight: 600;
+    }
+
+    .chat-form {
+      padding: 15px;
+    }
+
+    .chat-form label {
+      display: block;
+      font-size: 0.9em;
+      color: #555;
+      margin-bottom: 4px;
+      text-align: left;
+    }
+
+    .chat-form input,
+    .chat-form textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .chat-form textarea {
+      height: 80px;
+      resize: vertical;
+    }
+
+    .chat-message {
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .chat-send {
+      width: 100%;
+      padding: 11px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .chat-send:hover {
+      background: #1a7bd8;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 600px) {
+      .container {
+        margin: 40px 15px 80px;
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 1.8rem;
+      }
+
+      .top-nav {
+        flex-wrap: wrap;
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .top-nav a {
+        font-size: 0.9rem;
+        padding: 6px 12px;
+      }
+
+      .leaderboard th,
+      .leaderboard td {
+        padding: 8px 6px;
+        font-size: 0.85rem;
+      }
+
+      .chat-widget {
+        bottom: 15px;
+        right: 15px;
+      }
+
+      .chat-button {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+      }
+
+      .chat-window {
+        width: 280px;
+        bottom: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Навигация -->
+  <nav class="top-nav">
+    <a href="/">Главная</a>
+    <a href="/achievements">Достижения</a>
+    <a href="/leaderboard" class="active">Топ</a>
+    <a href="/faq">Помощь</a>
+    <a href="/login">Вход</a>
+  </nav>
+
+  <!-- Основной контент -->
+<div class="container">
+  <div class="nenado"><h1>Находиться в разработке</h1></div>
+  <div class="container">
+    <h1>ТОП пользователей</h1>
+
+    <!-- ТОП по баллам -->
+    <h2>ТОП по рангу</h2>
+    <table class="leaderboard">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Аккаунт</th>
+          <th>Ранг</th>
+          <th>GP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="rank-num">1</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">2</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">3</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">4</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">5</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">6</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">7</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">8</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">9</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+        <tr>
+          <td class="rank-num">10</td>
+          <td class="username">@User</td>
+          <td class="user-rank"></td>
+          <td class="points">0</td>
+        </tr>
+      </tbody>
+    </table>
+
+
+    <p class="call-to-action">
+      <a href="https://t.me/Friendly_MapBot">Добавляйте локации в Telegram →</a>
+    </p>
+  </div>
+
+  <!-- Чат с поддержкой -->
+  <div class="chat-widget">
+    <button class="chat-button" onclick="toggleChat()">❓</button>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">Задать вопрос администратору</div>
+      <div class="chat-form">
+        <form id="supportForm">
+          <label for="supportName">Имя</label>
+          <input type="text" id="supportName" placeholder="Находиться в разработке" required>
+          <label for="supportEmail">Email</label>
+          <input type="email" id="supportEmail" placeholder="Находиться в разработке" required>
+          <label for="supportMessage">Сообщение</label>
+          <textarea id="supportMessage" placeholder="Находиться в разработке" required></textarea>
+          <div class="chat-message" id="supportMessageEl"></div>
+        </form>
+      </div>
+      <div style="padding: 0 15px 15px;">
+        <button class="chat-send" onclick="sendSupportMessage()">Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // === Чат функции ===
+    function toggleChat() {
+      const win = document.getElementById('chatWindow');
+      win.style.display = win.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    async function sendSupportMessage() {
+      const name = document.getElementById('supportName').value;
+      const email = document.getElementById('supportEmail').value;
+      const msg = document.getElementById('supportMessage').value;
+      const msgEl = document.getElementById('supportMessageEl');
+
+      if (!name || !email || !msg) {
+        showMessage(msgEl, 'Заполните все поля', false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message: msg })
+        });
+
+        if (res.ok) {
+          showMessage(msgEl, 'Сообщение отправлено! Ответим в ближайшее время.', true);
+          document.getElementById('supportForm').reset();
+          setTimeout(() => {
+            document.getElementById('chatWindow').style.display = 'none';
+          }, 3000);
+        } else {
+          showMessage(msgEl, 'Ошибка отправки. Попробуйте позже.', false);
+        }
+      } catch (err) {
+        showMessage(msgEl, 'Ошибка подключения к серверу', false);
+      }
+    }
+
+    function showMessage(el, text, success) {
+      el.textContent = text;
+      el.style.display = 'block';
+      el.style.background = success ? '#e8f5e9' : '#ffebee';
+      el.style.color = success ? '#2e7d32' : '#c62828';
+    }
+
+    // Закрытие чата при клике вне окна
+    document.addEventListener('click', (e) => {
+      const chat = document.querySelector('.chat-widget');
+      const win = document.getElementById('chatWindow');
+      if (chat && !chat.contains(e.target) && win.style.display === 'flex') {
+        win.style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

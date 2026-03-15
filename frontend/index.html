@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Frendly Map — Сделай город доступнее</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      background: url('/static/images/city-bg-full.png') center center / 101% auto no-repeat fixed;
+      background-color: #cbe6f7;
+    }
+
+    /* Навигация */
+    .top-nav {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 14px 30px;
+      border-radius: 50px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 100px;
+      width: 100%;
+      max-width: 700px;
+      margin-top: 40px;
+      z-index: 10;
+    }
+
+    .top-nav a {
+      padding: 8px 16px;
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: 600;
+      font-size: 1.25rem;
+      border-radius: 30px;
+      transition: all 0.2s ease;
+    }
+
+    .top-nav a:hover,
+    .top-nav a.active {
+      background: #2997f5;
+      color: white;
+      padding: 8px 20px;
+    }
+
+    /* Центральный блок */
+    .hero-card {
+      background: white;
+      border-radius: 200px;
+      padding: 40px 30px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      max-width: 500px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 5;
+      margin-top: 0;
+    }
+
+    .hero-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .contact-box {
+      margin: 30px auto 0;
+      max-width: 550px;   /* ← увеличенная ширина */
+      width: 100%;
+      text-align: center;
+      background: white;
+      padding: 25px 35px; /* ← больше отступов по бокам */
+      border-radius: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+    /* Логотип — теперь картинка */
+    .hero-logo-icon {
+      width: 65px;       /* можно изменить: 32px, 64px */
+      height: auto;
+      border-radius: 50%;
+      object-fit: cover;
+      background: white;
+      padding: 4px;
+    }
+
+    .hero-logo-text {
+      font-size: 2.52rem;
+      color: #006699;
+      font-weight: 600;
+    }
+
+    .hero-slogan {
+      font-size: 1.51rem;
+      color: #666;
+      margin: 16px 0;
+      line-height: 1.4;
+    }
+
+    .btn-telegram {
+      width: 100%;
+      max-width: 360px;
+      padding: 18px 24px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      font-size: 1.25rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(41, 151, 245, 0.5);
+      margin-top: 20px;
+      transition: all 0.35s ease;
+    }
+
+    .btn-telegram:hover {
+      background: #1a7bd8;
+      transform: translateY(-3px);
+      box-shadow: 0 12px 28px rgba(41, 151, 245, 0.6);
+    }
+
+    /* Вкладки обновлений */
+    .updates-tabs {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+      margin: 40px auto 0;
+      max-width: 500px;
+      width: 100%;
+    }
+
+    .update-tab {
+      padding: 10px 24px;
+      background: #e3f2fd;
+      color: #0077cc;
+      border-radius: 30px;
+      font-weight: 600;
+      font-size: 1.15rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .update-tab.active {
+      background: #2997f5;
+      color: white;
+    }
+
+    .update-content {
+      display: none;
+      margin: 20px auto 0;
+      max-width: 500px;
+      width: 100%;
+      text-align: left;
+      background: white;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .update-content.active {
+      display: block;
+    }
+
+    .update-item {
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #eee;
+    }
+
+    .update-item:last-child {
+      border-bottom: none;
+      margin-bottom: 0;
+      padding-bottom: 0;
+    }
+
+    .update-title {
+      font-weight: 600;
+      color: #0077cc;
+      margin-bottom: 6px;
+    }
+
+    .update-list {
+      padding-left: 20px;
+      color: #444;
+      line-height: 1.5;
+    }
+
+    /* Чат */
+    .chat-widget {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .chat-button {
+      width: 60px;
+      height: 60px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .chat-window {
+      width: 320px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      position: absolute;
+      bottom: 70px;
+      right: 0;
+      display: none;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: #2997f5;
+      color: white;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      font-weight: 600;
+    }
+
+    .chat-form {
+      padding: 15px;
+    }
+
+    .chat-form label {
+      display: block;
+      font-size: 0.9em;
+      color: #555;
+      margin-bottom: 4px;
+      text-align: left;
+    }
+
+    .chat-form input,
+    .chat-form textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .chat-form textarea {
+      height: 80px;
+      resize: vertical;
+    }
+
+    .chat-message {
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .chat-send {
+      width: 100%;
+      padding: 11px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .chat-send:hover {
+      background: #1a7bd8;
+    }
+
+    /* Адаптивность */
+    @media (max-width: 600px) {
+      .top-nav {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 12px 20px;
+      }
+
+      .top-nav a {
+        font-size: 0.95rem;
+        padding: 6px 14px;
+      }
+
+      .hero-card {
+        padding: 30px 20px;
+      }
+
+      .hero-slogan {
+        font-size: 1rem;
+      }
+
+      .btn-telegram {
+        padding: 16px 20px;
+        font-size: 1.1rem;
+      }
+
+      .updates-tabs {
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .update-tab {
+        padding: 8px 20px;
+        font-size: 1.05rem;
+      }
+
+      .update-content {
+        max-height: 300px;
+        padding: 15px;
+      }
+
+      .chat-widget {
+        bottom: 15px;
+        right: 15px;
+      }
+
+      .chat-button {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+      }
+
+      .chat-window {
+        width: 280px;
+        bottom: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Навигация -->
+  <nav class="top-nav">
+    <a href="/" class="active">Главная</a>
+    <a href="/achievements">Достижения</a>
+    <a href="/leaderboard">Топ</a>
+    <a href="/faq">Помощь</a>
+    <a href="/login">Вход</a>
+  </nav>
+
+  <!-- Центральный блок -->
+  <div class="hero-card">
+    <div class="hero-logo">
+      <!-- ⬇️ УКАЖИ СВОЙ ПУТЬ К ЛОГОТИПУ ЗДЕСЬ ⬇️ -->
+      <img src="/static/images/logo.png" alt="Frendly Map" class="hero-logo-icon">
+      <div class="hero-logo-text">Frendly Map</div>
+    </div>
+    <div class="hero-slogan">
+      Добавляй метки доступных мест и получай награды!
+    </div>
+    <button id="botLink" class="btn-telegram">🚀 Начать в Telegram</button>
+  </div>
+
+  <!-- Вкладки обновлений -->
+  <div class="updates-tabs">
+    <div class="update-tab active" onclick="switchUpdate('done')">🔜 Планы</div>
+  </div>
+
+  <!-- Реализовано -->
+  <div id="done" class="update-content active">
+    <div class="update-item">
+      <div class="update-title">Планы на Март - Май</div>
+      <ul class="update-list">
+        <li></li>
+      </ul>
+    </div>
+  </div>
+
+  <div id="done" class="contact-box active">
+    <div class="update-item">
+      <div class="update-title">По вопросам пишите нам на почту: friendlymapbot@gmail.com
+</div>
+  <!-- Чат -->
+  <div class="chat-widget">
+    <button class="chat-button" onclick="toggleChat()">❓</button>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">Задать вопрос администратору</div>
+      <div class="chat-form">
+        <form id="supportForm">
+          <label for="supportName">Имя</label>
+          <input type="text" id="supportName" placeholder="Находиться в разработке" required>
+          <label for="supportEmail">Email</label>
+          <input type="email" id="supportEmail" placeholder="Находиться в разработке" required>
+          <label for="supportMessage">Сообщение</label>
+          <textarea id="supportMessage" placeholder="Находиться в разработке" required></textarea>
+          <div class="chat-message" id="supportMessageEl"></div>
+        </form>
+      </div>
+      <div style="padding: 0 15px 15px;">
+        <button class="chat-send" onclick="sendSupportMessage()">Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById("botLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      window.open("https://t.me/Friendly_MapBot  ", '_blank'); // ✅ Исправлено: убраны пробелы
+    });
+
+    function toggleChat() {
+      const win = document.getElementById('chatWindow');
+      win.style.display = win.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    async function sendSupportMessage() {
+      const name = document.getElementById('supportName').value;
+      const email = document.getElementById('supportEmail').value;
+      const msg = document.getElementById('supportMessage').value;
+      const msgEl = document.getElementById('supportMessageEl');
+
+      if (!name || !email || !msg) {
+        showMessage(msgEl, 'Все поля обязательны', false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message: msg })
+        });
+
+        if (res.ok) {
+          showMessage(msgEl, 'Спасибо! Ответим скоро.', true);
+          document.getElementById('supportForm').reset();
+          setTimeout(() => { document.getElementById('chatWindow').style.display = 'none'; }, 2500);
+        } else {
+          showMessage(msgEl, 'Ошибка. Попробуйте позже.', false);
+        }
+      } catch (err) {
+        showMessage(msgEl, 'Нет связи с сервером', false);
+      }
+    }
+
+    function showMessage(el, text, success) {
+      el.textContent = text;
+      el.style.display = 'block';
+      el.style.background = success ? '#e8f5e9' : '#ffebee';
+      el.style.color = success ? '#2e7d32' : '#d32f2f';
+    }
+
+    document.addEventListener('click', (e) => {
+      const chat = document.querySelector('.chat-widget');
+      const win = document.getElementById('chatWindow');
+      if (chat && !chat.contains(e.target) && win && win.style.display === 'flex') {
+        win.style.display = 'none';
+      }
+    });
+
+    function switchUpdate(tabId) {
+      document.querySelectorAll('.update-tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.querySelectorAll('.update-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+    }
+  </script>
+</body>
+</html>

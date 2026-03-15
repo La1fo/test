@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход — Frendly Map</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+      text-align: center;
+      position: relative;
+      background: url('/static/images/city-bg-full.png') center center / 101% auto no-repeat fixed;
+      background-color: #cbe6f7;
+    }
+
+    .container {
+      max-width: 450px;
+      margin: 60px auto 100px;
+      padding: 30px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    }
+
+    h2 {
+      font-size: 2rem;
+      margin-bottom: 20px;
+      color: #006699;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+
+    .info-text {
+      margin-bottom: 25px;
+      line-height: 1.5;
+      color: #555;
+    }
+
+    /* Навигация */
+    .top-nav {
+      background: rgba(255, 255, 255, 0.9);
+      padding: 14px 30px;
+      border-radius: 50px;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      margin-bottom: 100px;
+      width: 100%;
+      max-width: 700px;
+      margin-top: 40px;
+      z-index: 10;
+    }
+
+    .top-nav a {
+      padding: 8px 16px;
+      text-decoration: none;
+      color: #0077cc;
+      font-weight: 600;
+      font-size: 1.25rem;
+      border-radius: 30px;
+      transition: all 0.2s ease;
+    }
+
+    .top-nav a:hover,
+    .top-nav a.active {
+      background: #2997f5;
+      color: white;
+      padding: 8px 20px;
+    }
+
+    /* Форма входа по email */
+    .email-login {
+      margin-top: 20px;
+    }
+
+    .email-login p {
+      margin-bottom: 12px;
+      color: #666;
+      font-size: 0.95rem;
+    }
+
+    .email-form {
+      display: flex;
+      gap: 8px;
+    }
+
+    .email-form input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+    }
+
+    .email-form button {
+      padding: 10px 16px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .email-form button:hover {
+      background: #1a7bd8;
+    }
+
+    .message {
+      text-align: center;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 15px 0;
+      display: none;
+    }
+
+    .message.success {
+      background: #e8f5e9;
+      color: #2e7d32;
+      display: block;
+    }
+
+    .message.error {
+      background: #ffebee;
+      color: #c62828;
+      display: block;
+    }
+
+    /* Чат */
+    .chat-widget {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .chat-button {
+      width: 60px;
+      height: 60px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 24px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .chat-window {
+      width: 320px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+      position: absolute;
+      bottom: 70px;
+      right: 0;
+      display: none;
+      flex-direction: column;
+    }
+
+    .chat-header {
+      padding: 15px;
+      background: #2997f5;
+      color: white;
+      border-top-left-radius: 12px;
+      border-top-right-radius: 12px;
+      font-weight: 600;
+    }
+
+    .chat-form {
+      padding: 15px;
+    }
+
+    .chat-form label {
+      display: block;
+      font-size: 0.9em;
+      color: #555;
+      margin-bottom: 4px;
+      text-align: left;
+    }
+
+    .chat-form input,
+    .chat-form textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .chat-form textarea {
+      height: 80px;
+      resize: vertical;
+    }
+
+    .chat-message {
+      padding: 10px;
+      border-radius: 6px;
+      margin-top: 10px;
+      text-align: center;
+      display: none;
+    }
+
+    .chat-send {
+      width: 100%;
+      padding: 11px;
+      background: #2997f5;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 15px;
+    }
+
+    .chat-send:hover {
+      background: #1a7bd8;
+    }
+
+    @media (max-width: 600px) {
+      .container {
+        margin: 40px 15px 80px;
+        padding: 20px;
+      }
+
+      h2 {
+        font-size: 1.6rem;
+      }
+
+      .top-nav {
+        flex-wrap: wrap;
+        padding: 10px;
+        gap: 8px;
+      }
+
+      .top-nav a {
+        font-size: 0.9rem;
+        padding: 6px 12px;
+      }
+
+      .email-form {
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .chat-widget {
+        bottom: 15px;
+        right: 15px;
+      }
+
+      .chat-button {
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+      }
+
+      .chat-window {
+        width: 280px;
+        bottom: 60px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Навигация -->
+  <nav class="top-nav">
+    <a href="/">Главная</a>
+    <a href="/achievements">Достижения</a>
+    <a href="/leaderboard">Топ</a>
+    <a href="/faq">Помощь</a>
+    <a href="/login" class="active">Вход</a>
+  </nav>
+
+  <!-- Основной контент -->
+  <div class="container">
+    <h2>🔐 Вход по Telegram</h2>
+
+    <p class="info-text">
+      Временно недоступен
+    </p>
+
+    <div class="email-login">
+      <form id="emailLoginForm" onsubmit="handleEmailLogin(event)">
+        <div class="email-form">
+          <input type="email" id="emailInput" placeholder="Находиться в разработке" required>
+          <button type="submit">Войти</button>
+        </div>
+      </form>
+      <div id="emailMessage" class="message"></div>
+    </div>
+  </div>
+
+  <!-- Чат -->
+  <div class="chat-widget">
+    <button class="chat-button" onclick="toggleChat()">❓</button>
+    <div class="chat-window" id="chatWindow">
+      <div class="chat-header">Задать вопрос администратору</div>
+      <div class="chat-form">
+        <form id="supportForm">
+          <label for="supportName">Имя</label>
+          <input type="text" id="supportName" placeholder="Находиться в разработке" required>
+          <label for="supportEmail">Email</label>
+          <input type="email" id="supportEmail" placeholder="Находиться в разработке" required>
+          <label for="supportMessage">Сообщение</label>
+          <textarea id="supportMessage" placeholder="Находиться в разработке" required></textarea>
+          <div class="chat-message" id="supportMessageEl"></div>
+        </form>
+      </div>
+      <div style="padding: 0 15px 15px;">
+        <button class="chat-send" onclick="sendSupportMessage()">Отправить</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleChat() {
+      const win = document.getElementById('chatWindow');
+      win.style.display = win.style.display === 'flex' ? 'none' : 'flex';
+    }
+
+    async function sendSupportMessage() {
+      const name = document.getElementById('supportName').value;
+      const email = document.getElementById('supportEmail').value;
+      const msg = document.getElementById('supportMessage').value;
+      const msgEl = document.getElementById('supportMessageEl');
+
+      if (!name || !email || !msg) {
+        showMessage(msgEl, 'Все поля обязательны', false);
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/support', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, message: msg })
+        });
+
+        if (res.ok) {
+          showMessage(msgEl, 'Спасибо! Ответим скоро.', true);
+          document.getElementById('supportForm').reset();
+          setTimeout(() => { document.getElementById('chatWindow').style.display = 'none'; }, 2500);
+        } else {
+          showMessage(msgEl, 'Ошибка. Попробуйте позже.', false);
+        }
+      } catch (err) {
+        showMessage(msgEl, 'Нет связи с сервером', false);
+      }
+    }
+
+    function showMessage(el, text, success) {
+      el.textContent = text;
+      el.style.display = 'block';
+      el.style.background = success ? '#e8f5e9' : '#ffebee';
+      el.style.color = success ? '#2e7d32' : '#d32f2f';
+    }
+
+    document.addEventListener('click', (e) => {
+      const chat = document.querySelector('.chat-widget');
+      const win = document.getElementById('chatWindow');
+      if (chat && !chat.contains(e.target) && win && win.style.display === 'flex') {
+        win.style.display = 'none';
+      }
+    });
+
+    // Вход по email → сразу на профиль (для просмотра)
+    function handleEmailLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('emailInput').value.trim();
+      if (!email) {
+        alert('Введите email');
+        return;
+      }
+      // Просто перенаправляем на профиль (демо)
+      window.location.href = '';
+    }
+  </script>
+</body>
+</html>
