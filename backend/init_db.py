@@ -1,10 +1,17 @@
 """Инициализация таблиц и базовых данных FriendlyMap."""
 
+from __future__ import annotations
+
 import os
+import subprocess
 import sys
+from pathlib import Path
 from urllib.parse import urlsplit
 
 sys.path.insert(0, os.path.dirname(__file__))
+
+
+REQUIREMENTS_PATH = Path(__file__).resolve().parent.parent / "requirements.txt"
 
 
 def _safe_db_url(db_url: str) -> str:
@@ -18,23 +25,72 @@ def _safe_db_url(db_url: str) -> str:
     return f"{parts.scheme}://{user}:***@{host}{port}{parts.path}"
 
 
-def _print_dependency_help(exc: Exception) -> None:
-    print("❌ Не хватает Python-зависимостей для запуска init_db.")
-    print(f"Причина: {exc}")
-    print("Установите зависимости текущим интерпретатором:")
-    print("python3 -m pip install -r requirements.txt")
+def _install_dependencies() -> bool:
+    if not REQUIREMENTS_PATH.exists():
+        print("❌ Файл requirements.txt не найден, автоустановка зависимостей невозможна.")
+        return False
+
+    print("ℹ️ Пробуем установить недостающие зависимости...")
+    cmd = [sys.executable, "-m", "pip", "install", "-r", str(REQUIREMENTS_PATH)]
+
+    try:
+        result = subprocess.run(cmd, check=False)
+    except OSError as exc:
+        print(f"❌ Не удалось запустить pip: {exc}")
+        return False
+
+    if result.returncode != 0:
+        print("❌ Автоустановка зависимостей завершилась ошибкой.")
+        print(f"Запустите вручную: {sys.executable} -m pip install -r {REQUIREMENTS_PATH}")
+        return False
+
+    print("✅ Зависимости установлены.")
+    return True
 
 
-def main() -> int:
+def _load_db_modules():
+    """Ленивая загрузка модулей БД с автоустановкой зависимостей при необходимости."""
     try:
         from sqlalchemy.exc import OperationalError
         from sqlalchemy.orm import sessionmaker
 
         from database import BOT_DB_URL, bot_engine
         from models.database_models import Achievement, Base
-    except (ModuleNotFoundError, RuntimeError) as exc:
-        _print_dependency_help(exc)
+
+        return OperationalError, sessionmaker, BOT_DB_URL, bot_engine, Achievement, Base
+    except ModuleNotFoundError as exc:
+        print("❌ Не хватает Python-зависимостей для запуска init_db.")
+        print(f"Причина: {exc}")
+
+        auto_install = os.getenv("AUTO_INSTALL_DEPS", "1").strip() not in {"0", "false", "False"}
+        if not auto_install:
+            print("Автоустановка отключена (AUTO_INSTALL_DEPS=0).")
+            print(f"Установите вручную: {sys.executable} -m pip install -r {REQUIREMENTS_PATH}")
+            return None
+
+        if not _install_dependencies():
+            return None
+
+        # Повторяем импорт после установки
+        from sqlalchemy.exc import OperationalError
+        from sqlalchemy.orm import sessionmaker
+
+        from database import BOT_DB_URL, bot_engine
+        from models.database_models import Achievement, Base
+
+        return OperationalError, sessionmaker, BOT_DB_URL, bot_engine, Achievement, Base
+    except RuntimeError as exc:
+        print("❌ Ошибка инициализации БД.")
+        print(exc)
+        return None
+
+
+def main() -> int:
+    loaded = _load_db_modules()
+    if loaded is None:
         return 1
+
+    OperationalError, sessionmaker, BOT_DB_URL, bot_engine, Achievement, Base = loaded
 
     print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
 
