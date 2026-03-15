@@ -51,13 +51,28 @@ def _load_leaderboard() -> tuple[list[dict[str, Any]], str | None]:
         table_map = resolve_table_mapping()
         users_table = table_map["users"]
 
-        points_col = resolve_column(users_table, ["total_points", "points", "score", "rating"])
+        gp_override = os.getenv("FM_GP_COLUMN", "").strip()
+        gp_candidates = [
+            gp_override,
+            "gp",
+            "gp_points",
+            "rank_points",
+            "rating_points",
+            "total_gp",
+            "total_points",
+            "score",
+            "rating",
+            "points",
+            "coins",
+        ]
+        points_col = resolve_column(users_table, [c for c in gp_candidates if c])
         username_col = resolve_column(users_table, ["username", "user_name", "telegram_username", "name"])
 
         if not points_col or not username_col:
             return [], (
-                f"В таблице {users_table} нет нужных колонок для лидерборда "
-                f"(points={points_col}, username={username_col})."
+                f"В таблице {users_table} нет нужных колонок для лидерборда GP "
+                f"(gp={points_col}, username={username_col}). "
+                "Если GP хранится в отдельной колонке, укажите FM_GP_COLUMN в .env."
             )
 
         with get_connection() as conn:
