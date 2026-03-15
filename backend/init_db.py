@@ -3,13 +3,6 @@
 import os
 from urllib.parse import urlsplit
 
-import psycopg2
-
-try:
-    from .database import BOT_DB_URL, get_connection
-except ImportError:
-    from database import BOT_DB_URL, get_connection
-
 
 def _safe_db_url(db_url: str) -> str:
     parts = urlsplit(db_url)
@@ -22,7 +15,17 @@ def _safe_db_url(db_url: str) -> str:
     return f"{parts.scheme}://{user}:***@{host}{port}{parts.path}"
 
 
-def _create_tables() -> None:
+def _load_db_api():
+    try:
+        from .database import BOT_DB_URL, get_connection
+    except ModuleNotFoundError:
+        raise
+    except ImportError:
+        from database import BOT_DB_URL, get_connection
+    return BOT_DB_URL, get_connection
+
+
+def _create_tables(get_connection) -> None:
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
@@ -55,7 +58,7 @@ def _create_tables() -> None:
         conn.commit()
 
 
-def _seed_achievements() -> None:
+def _seed_achievements(get_connection) -> None:
     achievements = [
         ("facade_expert", "Эксперт по фасадам", 150),
         ("night_watch", "Ночной дозор", 120),
@@ -86,7 +89,29 @@ def _seed_achievements() -> None:
         print("✅ Достижения добавлены")
 
 
+def _print_connection_help(error_text: str) -> None:
+    print("❌ Не удалось подключиться к PostgreSQL.")
+
+    if "password authentication failed" in error_text:
+        print("Причина: неверный логин/пароль PostgreSQL.")
+    elif "Connection refused" in error_text:
+        print("Причина: PostgreSQL не запущен или недоступен на указанном хосте/порте.")
+    elif "does not exist" in error_text:
+        print("Причина: указанная база данных не существует.")
+
+    print("Проверьте DATABASE_URL или POSTGRES_HOST/PORT/DB/USER/PASSWORD в .env.")
+
+
 def main() -> int:
+    try:
+        BOT_DB_URL, get_connection = _load_db_api()
+    except ModuleNotFoundError as exc:
+        print("❌ Не хватает Python-зависимостей для запуска init_db.")
+        print(f"Причина: {exc}")
+        print("Установите зависимости текущим интерпретатором:")
+        print("python3 -m pip install -r requirements.txt")
+        return 1
+
     print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
 
     if os.getenv("POSTGRES_PASSWORD", "").strip() == "" and not os.getenv(
@@ -99,21 +124,14 @@ def main() -> int:
     print("Создаём таблицы...")
 
     try:
-        _create_tables()
+        _create_tables(get_connection)
         print("✅ Таблицы созданы")
-        _seed_achievements()
-    except psycopg2.OperationalError as exc:
-        error_text = str(exc)
-        print("❌ Не удалось подключиться к PostgreSQL.")
-
-        if "password authentication failed" in error_text:
-            print("Причина: неверный логин/пароль PostgreSQL.")
-        elif "Connection refused" in error_text:
-            print("Причина: PostgreSQL не запущен или недоступен на указанном хосте/порте.")
-        elif "does not exist" in error_text:
-            print("Причина: указанная база данных не существует.")
-
-        print("Проверьте DATABASE_URL или POSTGRES_HOST/PORT/DB/USER/PASSWORD в .env.")
+        _seed_achievements(get_connection)
+    except RuntimeError as exc:
+        print(f"❌ {exc}")
+        return 1
+    except Exception as exc:
+        _print_connection_help(str(exc))
         return 1
 
     return 0

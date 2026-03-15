@@ -1,10 +1,10 @@
+import importlib
 import os
 from contextlib import contextmanager
+from typing import Any
 from urllib.parse import quote_plus
 
-import psycopg2
 from dotenv import load_dotenv
-from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
@@ -19,17 +19,36 @@ def _build_postgres_dsn() -> str:
     database = os.getenv("POSTGRES_DB", "friendlymap").strip()
     user = quote_plus(os.getenv("POSTGRES_USER", "postgres").strip())
     password = quote_plus(os.getenv("POSTGRES_PASSWORD", "").strip())
-
     return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
 BOT_DB_URL = _build_postgres_dsn()
 
 
+def _load_postgres_driver() -> Any:
+    """Пытается загрузить драйвер PostgreSQL (psycopg2 или psycopg)."""
+    for module_name in ("psycopg2", "psycopg"):
+        try:
+            return importlib.import_module(module_name)
+        except ModuleNotFoundError:
+            continue
+
+    raise RuntimeError(
+        "Не найден драйвер PostgreSQL. Установите зависимости: "
+        "python3 -m pip install -r requirements.txt"
+    )
+
+
 @contextmanager
 def get_connection(dict_cursor: bool = False):
-    cursor_factory = RealDictCursor if dict_cursor else None
-    conn = psycopg2.connect(BOT_DB_URL, connect_timeout=5, cursor_factory=cursor_factory)
+    driver = _load_postgres_driver()
+
+    connect_kwargs = {"connect_timeout": 5}
+    if dict_cursor and driver.__name__ == "psycopg2":
+        extras = importlib.import_module("psycopg2.extras")
+        connect_kwargs["cursor_factory"] = extras.RealDictCursor
+
+    conn = driver.connect(BOT_DB_URL, **connect_kwargs)
     try:
         yield conn
     finally:
