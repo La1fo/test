@@ -1,6 +1,7 @@
 # backend/init_db.py
 import os
 import sys
+from urllib.parse import urlsplit
 
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
@@ -10,17 +11,37 @@ sys.path.insert(0, os.path.dirname(__file__))
 from database import BOT_DB_URL, bot_engine
 from models.database_models import Achievement, Base
 
-print(f"Используем БД: {BOT_DB_URL}")
+
+def _safe_db_url(db_url: str) -> str:
+    parts = urlsplit(db_url)
+    if not parts.password:
+        return db_url
+    netloc = f"{parts.username}:***@{parts.hostname}:{parts.port}"
+    return f"{parts.scheme}://{netloc}{parts.path}"
+
+
+print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
+
+if os.getenv("POSTGRES_PASSWORD", "").strip() == "" and not os.getenv("DATABASE_URL", "").strip():
+    print("⚠️ Внимание: POSTGRES_PASSWORD пустой. Укажите пароль в .env, иначе будет ошибка аутентификации.")
+
 print("Создаём таблицы...")
 
 try:
     Base.metadata.create_all(bind=bot_engine)
     print("✅ Таблицы созданы")
 except OperationalError as e:
-    print("❌ Не удалось подключиться к базе данных.")
-    print(
-        "Проверьте DATABASE_URL/DB_URL (логин, пароль, хост и порт) в .env или переменных окружения."
-    )
+    error_text = str(e.orig)
+    print("❌ Не удалось подключиться к PostgreSQL.")
+
+    if "password authentication failed" in error_text:
+        print("Причина: неверный логин/пароль PostgreSQL.")
+    elif "Connection refused" in error_text:
+        print("Причина: PostgreSQL не запущен или недоступен на указанном хосте/порте.")
+    elif "does not exist" in error_text:
+        print("Причина: указанная база данных не существует.")
+
+    print("Проверьте DATABASE_URL или POSTGRES_HOST/PORT/DB/USER/PASSWORD в .env.")
     raise SystemExit(1) from e
 
 Session = sessionmaker(bind=bot_engine)
