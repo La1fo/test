@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..database import get_connection
+from ..database import DB_READ_ONLY, get_connection
 from ..schemas import TelegramAuthPayload, UserCreate
 from ..security import (
     create_access_token,
@@ -35,6 +35,11 @@ def login_telegram(payload: TelegramAuthPayload):
             row = cur.fetchone()
 
             if row is None:
+                if DB_READ_ONLY:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="User does not exist in read-only DB. Create user in source FriendlyMap DB.",
+                    )
                 cur.execute(
                     """
                     INSERT INTO website_users (telegram_id, username)
@@ -53,6 +58,9 @@ def login_telegram(payload: TelegramAuthPayload):
 
 @router.post("/email/register")
 def register_email(user: UserCreate):
+    if DB_READ_ONLY:
+        raise HTTPException(status_code=403, detail="Registration disabled: database is read-only")
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT 1 FROM website_users WHERE email = %s", (user.email,))

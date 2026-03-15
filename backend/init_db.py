@@ -1,7 +1,14 @@
-"""Инициализация таблиц и базовых данных FriendlyMap в PostgreSQL."""
+"""Проверка подключения к существующим таблицам FriendlyMap в PostgreSQL."""
 
 import os
 from urllib.parse import urlsplit
+
+
+EXPECTED_TABLES = (
+    "website_users",
+    "website_achievements",
+    "website_user_achievements",
+)
 
 
 def _safe_db_url(db_url: str) -> str:
@@ -17,12 +24,30 @@ def _safe_db_url(db_url: str) -> str:
 
 def _load_db_api():
     try:
-        from .database import BOT_DB_URL, get_connection
+        from .database import BOT_DB_URL, DB_READ_ONLY, get_connection
     except ModuleNotFoundError:
         raise
     except ImportError:
-        from database import BOT_DB_URL, get_connection
-    return BOT_DB_URL, get_connection
+        from database import BOT_DB_URL, DB_READ_ONLY, get_connection
+    return BOT_DB_URL, DB_READ_ONLY, get_connection
+
+
+def _check_tables_exist(get_connection) -> tuple[bool, list[str]]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                  AND table_name = ANY(%s)
+                """,
+                (list(EXPECTED_TABLES),),
+            )
+            found = {row[0] for row in cur.fetchall()}
+
+    missing = [name for name in EXPECTED_TABLES if name not in found]
+    return len(missing) == 0, missing
 
 
 def _create_tables(get_connection) -> None:
@@ -58,37 +83,6 @@ def _create_tables(get_connection) -> None:
         conn.commit()
 
 
-def _seed_achievements(get_connection) -> None:
-    achievements = [
-        ("facade_expert", "Эксперт по фасадам", 150),
-        ("night_watch", "Ночной дозор", 120),
-        ("detail_master", "Мастер деталей", 100),
-        ("architect_critic", "Архитектурный критик", 250),
-        ("first_friend", "Первый друг", 100),
-        ("teamwork", "Командная работа", 150),
-        ("trendsetter", "Трендсеттер", 250),
-    ]
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT COUNT(*) FROM website_achievements")
-            count = cur.fetchone()[0]
-            if count > 0:
-                print("ℹ️ Достижения уже есть в БД")
-                return
-
-            cur.executemany(
-                """
-                INSERT INTO website_achievements (id, name, reward_points)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (id) DO NOTHING
-                """,
-                achievements,
-            )
-        conn.commit()
-        print("✅ Достижения добавлены")
-
-
 def _print_connection_help(error_text: str) -> None:
     print("❌ Не удалось подключиться к PostgreSQL.")
 
@@ -104,7 +98,7 @@ def _print_connection_help(error_text: str) -> None:
 
 def main() -> int:
     try:
-        BOT_DB_URL, get_connection = _load_db_api()
+        BOT_DB_URL, db_read_only, get_connection = _load_db_api()
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
         print(f"Причина: {exc}")
@@ -113,28 +107,32 @@ def main() -> int:
         return 1
 
     print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
-
-    if os.getenv("POSTGRES_PASSWORD", "").strip() == "" and not os.getenv(
-        "DATABASE_URL", ""
-    ).strip():
-        print(
-            "⚠️ Внимание: POSTGRES_PASSWORD пустой. Укажите пароль в .env, иначе будет ошибка аутентификации."
-        )
-
-    print("Создаём таблицы...")
+    print(f"Режим БД: {'read-only' if db_read_only else 'read-write'}")
 
     try:
+        has_all_tables, missing = _check_tables_exist(get_connection)
+        if has_all_tables:
+            print("✅ Найдены все необходимые таблицы")
+            return 0
+
+        print(f"⚠️ Отсутствуют таблицы: {', '.join(missing)}")
+        if db_read_only:
+            print(
+                "❌ В read-only режиме таблицы не создаются. Подключите БД, уже инициализированную в основном проекте FriendlyMap."
+            )
+            return 1
+
+        print("Создаём недостающие таблицы...")
         _create_tables(get_connection)
         print("✅ Таблицы созданы")
-        _seed_achievements(get_connection)
+        return 0
+
     except RuntimeError as exc:
         print(f"❌ {exc}")
         return 1
     except Exception as exc:
         _print_connection_help(str(exc))
         return 1
-
-    return 0
 
 
 if __name__ == "__main__":

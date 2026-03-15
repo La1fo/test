@@ -23,6 +23,7 @@ def _build_postgres_dsn() -> str:
 
 
 BOT_DB_URL = _build_postgres_dsn()
+DB_READ_ONLY = os.getenv("DB_READ_ONLY", "1").strip() in {"1", "true", "True", "yes", "on"}
 
 
 def _load_postgres_driver() -> Any:
