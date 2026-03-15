@@ -1,52 +1,72 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, Body
-from sqlalchemy.orm import Session
-from ..database import SessionLocal
-from ..models import User
-from ..security import get_password_hash, verify_password, create_access_token, verify_telegram_auth
-from ..schemas import UserCreate, Token
 import os
 
-router = APIRouter()
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+from ..database import get_db
+from ..models import WebsiteUser
+from ..schemas import TelegramLogin, Token, UserCreate, UserLogin
+from ..security import create_access_token, get_password_hash, verify_password, verify_telegram_auth
+
+router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-@router.post("/telegram")
-def login_telegram( dict, db: Session = Depends(get_db)):
-    if not verify_telegram_auth(data, TELEGRAM_BOT_TOKEN):
-        raise HTTPException(status_code=400, detail="Invalid Telegram auth")
-    telegram_id = int(data["id"])
-    username = data.get("username") or data.get("first_name", "user") + str(telegram_id)[-4:]
-    user = db.query(User).filter(User.telegram_id == telegram_id).first()
+
+@router.post("/telegram", response_model=Token)
+def login_telegram(data: TelegramLogin, db: Session = Depends(get_db)):
+    payload = data.model_dump()
+    if not verify_telegram_auth(payload, TELEGRAM_BOT_TOKEN):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Telegram auth")
+
+    telegram_id = payload["id"]
+    username = (payload.get("username") or f"{payload.get('first_name', 'user')}{str(telegram_id)[-4:]}").strip()[:80]
+
+    user = db.query(WebsiteUser).filter(WebsiteUser.telegram_id == telegram_id).first()
     if not user:
-        user = User(telegram_id=telegram_id, username=username)
+        user = WebsiteUser(telegram_id=telegram_id, username=username)
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            user = db.query(WebsiteUser).filter(WebsiteUser.telegram_id == telegram_id).first()
+            if not user:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Unable to create Telegram user")
+        else:
+            db.refresh(user)
+
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
 
-@router.post("/email/register")
-def register_email(user: UserCreate, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == user.email).first():
-        raise HTTPException(status_code=400, detail="Email already registered")
-    hashed_pw = get_password_hash(user.password)
-    db_user = User(email=user.email, username=user.username, hashed_password=hashed_pw)
-    db.add(db_user)
-    db.commit()
-    db.refresh(db_user)
-    return {"msg": "User created"}
 
-@router.post("/email/login")
-def login_email(email: str = Body(...), password: str = Body(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.hashed_password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+@router.post("/email/register", status_code=status.HTTP_201_CREATED)
+def register_email(user: UserCreate, db: Session = Depends(get_db)):
+    email = user.email.lower().strip()
+    username = user.username.strip()
+
+    db_user = WebsiteUser(
+        email=email,
+        username=username,
+        hashed_password=get_password_hash(user.password),
+    )
+    db.add(db_user)
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid registration data")
+
+    return {"message": "User created"}
+
+
+@router.post("/email/login", response_model=Token)
+def login_email(credentials: UserLogin = Body(...), db: Session = Depends(get_db)):
+    email = credentials.email.lower().strip()
+    user = db.query(WebsiteUser).filter(WebsiteUser.email == email).first()
+    if not user or not verify_password(credentials.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
+
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
