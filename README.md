@@ -1,20 +1,28 @@
 # FriendlyMap
 
-## Запуск с PostgreSQL
-1. Установите зависимости:
+## Безопасный запуск с PostgreSQL
+
+1. Создайте и активируйте виртуальное окружение (рекомендуется):
    ```bash
-   pip install -r requirements.txt
+   python3 -m venv .venv
+   source .venv/bin/activate
    ```
-2. Заполните `.env`:
-   - `SECRET_KEY` (минимум 32 символа)
-   - либо `DATABASE_URL`, либо `POSTGRES_HOST/PORT/DB/USER/PASSWORD`
-3. Инициализируйте БД:
+2. Установите зависимости **тем же интерпретатором**, которым будете запускать проект:
    ```bash
-   python -m backend.init_db
+   python3 -m pip install -r requirements.txt
    ```
-4. Запустите сайт:
+3. Заполните `.env`:
+   - `SECRET_KEY` (минимум 32 случайных символа)
+   - `DATABASE_URL`, либо `POSTGRES_HOST/PORT/DB/USER/PASSWORD`
+4. Инициализируйте БД:
    ```bash
-   python -m backend.main
+   python3 -m backend.init_db
+   ```
+5. Запустите сайт:
+   ```bash
+   python3 -m backend.main
    ```
 
-Подробный отчет по безопасности: `SECURITY_REVIEW.md`.
+## Безопасность
+- Отчёт по проверке безопасности: `SECURITY_REVIEW.md`.
+- Не храните реальные секреты в git; используйте переменные окружения/секрет-хранилище.

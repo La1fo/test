@@ -2,14 +2,20 @@ import os
 from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+
+try:
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Не найдена зависимость SQLAlchemy. Установите зависимости: python3 -m pip install -r requirements.txt"
+    ) from exc
 
 load_dotenv()
 
 
 def _build_postgres_url() -> str:
-    """Собирает PostgreSQL URL из DATABASE_URL/DB_URL или отдельных POSTGRES_* переменных."""
+    """Собирает PostgreSQL URL из DATABASE_URL/DB_URL или POSTGRES_* переменных."""
     explicit_url = (os.getenv("DATABASE_URL") or os.getenv("DB_URL") or "").strip()
     if explicit_url:
         return explicit_url
@@ -32,8 +38,6 @@ bot_engine = create_engine(
 )
 
 BotSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=bot_engine)
-
-# Совместимость с API-модулями
 SessionLocal = BotSessionLocal
 
 
@@ -43,16 +47,3 @@ def get_bot_db():
         yield db
     finally:
         db.close()
-
-
-def create_website_tables():
-    try:
-        from models.database_models import Base
-
-        Base.metadata.create_all(bind=bot_engine)
-        print("Все таблицы для сайта созданы/проверены")
-
-    except ImportError as e:
-        print(f"Ошибка импорта моделей: {e}")
-    except Exception as e:
-        print(f"Предупреждение при создании таблиц: {e}")
