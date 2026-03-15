@@ -1,14 +1,6 @@
-"""Проверка подключения к существующим таблицам FriendlyMap в PostgreSQL."""
+"""Проверка подключения к уже созданной базе FriendlyMap в PostgreSQL."""
 
-import os
 from urllib.parse import urlsplit
-
-
-EXPECTED_TABLES = (
-    "website_users",
-    "website_achievements",
-    "website_user_achievements",
-)
 
 
 def _safe_db_url(db_url: str) -> str:
@@ -24,63 +16,12 @@ def _safe_db_url(db_url: str) -> str:
 
 def _load_db_api():
     try:
-        from .database import BOT_DB_URL, DB_READ_ONLY, get_connection
+        from .database import BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
     except ModuleNotFoundError:
         raise
     except ImportError:
-        from database import BOT_DB_URL, DB_READ_ONLY, get_connection
-    return BOT_DB_URL, DB_READ_ONLY, get_connection
-
-
-def _check_tables_exist(get_connection) -> tuple[bool, list[str]]:
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                SELECT table_name
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name = ANY(%s)
-                """,
-                (list(EXPECTED_TABLES),),
-            )
-            found = {row[0] for row in cur.fetchall()}
-
-    missing = [name for name in EXPECTED_TABLES if name not in found]
-    return len(missing) == 0, missing
-
-
-def _create_tables(get_connection) -> None:
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS website_users (
-                    id SERIAL PRIMARY KEY,
-                    telegram_id BIGINT UNIQUE,
-                    email TEXT UNIQUE,
-                    username TEXT NOT NULL,
-                    hashed_password TEXT,
-                    total_points INTEGER NOT NULL DEFAULT 0,
-                    locations_count INTEGER NOT NULL DEFAULT 0
-                );
-
-                CREATE TABLE IF NOT EXISTS website_achievements (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    description TEXT,
-                    reward_points INTEGER NOT NULL DEFAULT 0
-                );
-
-                CREATE TABLE IF NOT EXISTS website_user_achievements (
-                    user_id INTEGER NOT NULL REFERENCES website_users(id) ON DELETE CASCADE,
-                    achievement_id TEXT NOT NULL REFERENCES website_achievements(id) ON DELETE CASCADE,
-                    unlocked_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-                    PRIMARY KEY (user_id, achievement_id)
-                );
-                """
-            )
-        conn.commit()
+        from database import BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
+    return BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
 
 
 def _print_connection_help(error_text: str) -> None:
@@ -98,7 +39,7 @@ def _print_connection_help(error_text: str) -> None:
 
 def main() -> int:
     try:
-        BOT_DB_URL, db_read_only, get_connection = _load_db_api()
+        BOT_DB_URL, db_read_only, resolve_table_mapping = _load_db_api()
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
         print(f"Причина: {exc}")
@@ -110,21 +51,11 @@ def main() -> int:
     print(f"Режим БД: {'read-only' if db_read_only else 'read-write'}")
 
     try:
-        has_all_tables, missing = _check_tables_exist(get_connection)
-        if has_all_tables:
-            print("✅ Найдены все необходимые таблицы")
-            return 0
-
-        print(f"⚠️ Отсутствуют таблицы: {', '.join(missing)}")
-        if db_read_only:
-            print(
-                "❌ В read-only режиме таблицы не создаются. Подключите БД, уже инициализированную в основном проекте FriendlyMap."
-            )
-            return 1
-
-        print("Создаём недостающие таблицы...")
-        _create_tables(get_connection)
-        print("✅ Таблицы созданы")
+        table_map = resolve_table_mapping()
+        print("✅ Найдены таблицы FriendlyMap:")
+        print(f"- users: {table_map['users']}")
+        print(f"- achievements: {table_map['achievements']}")
+        print(f"- user_achievements: {table_map['user_achievements']}")
         return 0
 
     except RuntimeError as exc:

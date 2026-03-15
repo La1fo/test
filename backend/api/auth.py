@@ -2,7 +2,7 @@ import os
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..database import DB_READ_ONLY, get_connection
+from ..database import DB_READ_ONLY, get_connection, resolve_table_mapping
 from ..schemas import TelegramAuthPayload, UserCreate
 from ..security import (
     create_access_token,
@@ -16,6 +16,10 @@ router = APIRouter()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
 
+def _tables() -> dict[str, str]:
+    return resolve_table_mapping()
+
+
 @router.post("/telegram")
 def login_telegram(payload: TelegramAuthPayload):
     data = payload.model_dump(exclude_none=True)
@@ -25,11 +29,12 @@ def login_telegram(payload: TelegramAuthPayload):
 
     telegram_id = int(data["id"])
     username = data.get("username") or f"user{str(telegram_id)[-4:]}"
+    users_table = _tables()["users"]
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id FROM website_users WHERE telegram_id = %s",
+                f"SELECT id FROM {users_table} WHERE telegram_id = %s",
                 (telegram_id,),
             )
             row = cur.fetchone()
@@ -41,8 +46,8 @@ def login_telegram(payload: TelegramAuthPayload):
                         detail="User does not exist in read-only DB. Create user in source FriendlyMap DB.",
                     )
                 cur.execute(
-                    """
-                    INSERT INTO website_users (telegram_id, username)
+                    f"""
+                    INSERT INTO {users_table} (telegram_id, username)
                     VALUES (%s, %s)
                     RETURNING id
                     """,
@@ -61,16 +66,18 @@ def register_email(user: UserCreate):
     if DB_READ_ONLY:
         raise HTTPException(status_code=403, detail="Registration disabled: database is read-only")
 
+    users_table = _tables()["users"]
+
     with get_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT 1 FROM website_users WHERE email = %s", (user.email,))
+            cur.execute(f"SELECT 1 FROM {users_table} WHERE email = %s", (user.email,))
             if cur.fetchone() is not None:
                 raise HTTPException(status_code=400, detail="Email already registered")
 
             hashed_pw = get_password_hash(user.password)
             cur.execute(
-                """
-                INSERT INTO website_users (email, username, hashed_password)
+                f"""
+                INSERT INTO {users_table} (email, username, hashed_password)
                 VALUES (%s, %s, %s)
                 """,
                 (user.email, user.username, hashed_pw),
@@ -82,10 +89,12 @@ def register_email(user: UserCreate):
 
 @router.post("/email/login")
 def login_email(email: str = Body(...), password: str = Body(...)):
+    users_table = _tables()["users"]
+
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "SELECT id, hashed_password FROM website_users WHERE email = %s",
+                f"SELECT id, hashed_password FROM {users_table} WHERE email = %s",
                 (email,),
             )
             row = cur.fetchone()
