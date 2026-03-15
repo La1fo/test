@@ -148,3 +148,27 @@ def fetchall(query: str, params: tuple | None = None, dict_cursor: bool = False)
         with conn.cursor() as cur:
             cur.execute(query, params)
             return cur.fetchall()
+
+
+@lru_cache(maxsize=16)
+def get_table_columns(table_name: str) -> set[str]:
+    table_name = _assert_identifier(table_name)
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = %s
+                """,
+                (table_name,),
+            )
+            return {row[0] for row in cur.fetchall()}
+
+
+def resolve_column(table_name: str, candidates: list[str]) -> str | None:
+    columns = get_table_columns(table_name)
+    for candidate in candidates:
+        if candidate in columns:
+            return candidate
+    return None
