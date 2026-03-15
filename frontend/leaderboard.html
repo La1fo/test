@@ -10,7 +10,12 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #333;
       min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
       padding: 20px;
+      text-align: center;
+      position: relative;
       background: url('/static/images/city-bg-full.png') center center / 102% auto no-repeat fixed;
     }
     .top-nav {
@@ -21,9 +26,10 @@
       justify-content: center;
       gap: 16px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      margin: 40px auto;
+      margin: 40px auto 100px;
       width: 100%;
       max-width: 700px;
+      z-index: 10;
     }
     .top-nav a {
       text-decoration: none;
@@ -41,7 +47,7 @@
     }
     .container {
       max-width: 900px;
-      margin: 32px auto 0;
+      margin: 0 auto;
       padding: 36px;
       background: white;
       border-radius: 20px;
