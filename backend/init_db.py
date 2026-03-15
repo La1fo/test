@@ -1,22 +1,31 @@
 # backend/init_db.py
 import os
 import sys
-sys.path.insert(0, os.path.dirname(__file__))
 
-from database import bot_engine
-from models.database_models import Base, Achievement
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import sessionmaker
 
-# Создаём таблицы
-print("Создаём таблицы...")
-Base.metadata.create_all(bind=bot_engine)
-print("✅ Таблицы созданы")
+sys.path.insert(0, os.path.dirname(__file__))
 
-# Заполняем таблицу достижений (пример)
+from database import BOT_DB_URL, bot_engine
+from models.database_models import Achievement, Base
+
+print(f"Используем БД: {BOT_DB_URL}")
+print("Создаём таблицы...")
+
+try:
+    Base.metadata.create_all(bind=bot_engine)
+    print("✅ Таблицы созданы")
+except OperationalError as e:
+    print("❌ Не удалось подключиться к базе данных.")
+    print(
+        "Проверьте DATABASE_URL/DB_URL (логин, пароль, хост и порт) в .env или переменных окружения."
+    )
+    raise SystemExit(1) from e
+
 Session = sessionmaker(bind=bot_engine)
 db = Session()
 
-# Проверяем, не заполнена ли уже
 if db.query(Achievement).count() == 0:
     print("Заполняем таблицу достижений...")
     achievements = [
