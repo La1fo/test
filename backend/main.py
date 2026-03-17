@@ -1,5 +1,5 @@
 import os
-from typing import Any
+from dataclasses import dataclass
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .database import get_connection, resolve_column, resolve_table_mapping
+from .database import get_connection, get_db_contract, validate_db_contract
 
 load_dotenv()
 
@@ -21,128 +21,98 @@ app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 templates = Jinja2Templates(directory=frontend_path)
 
 
-def _rank_name(points: int) -> str:
-    if points >= 2500:
-        return "Мастер-картограф"
-    if points >= 2000:
-        return "Картограф"
-    if points >= 1500:
-        return "Первооткрыватель"
-    if points >= 1000:
-        return "Путешественник"
-    if points >= 600:
-        return "Исследователь 1"
-    if points >= 300:
-        return "Исследователь 2"
-    return "Исследователь 3"
+@dataclass
+class LeaderboardRow:
+    username: str
+    rank_name: str
+    points: int
 
 
-def _is_truthy_seasonal(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    text = str(value).strip().lower()
-    return text in {"1", "true", "yes", "seasonal", "temporary", "event"}
+@dataclass
+class AchievementRow:
+    achievement_id: str
+    name: str
+    description: str | None
+    reward_points: int
+    is_seasonal: bool
 
 
-def _load_leaderboard() -> tuple[list[dict[str, Any]], str | None]:
+def _contract_healthcheck() -> str | None:
     try:
-        table_map = resolve_table_mapping()
-        users_table = table_map["users"]
+        ok, errors = validate_db_contract()
+    except Exception as exc:
+        return f"DB contract check failed: {exc}"
 
-        gp_override = os.getenv("FM_GP_COLUMN", "").strip()
-        gp_candidates = [
-            gp_override,
-            "gp",
-            "gp_points",
-            "rank_points",
-            "rating_points",
-            "total_gp",
-            "total_points",
-            "score",
-            "rating",
-            "points",
-            "coins",
-        ]
-        points_col = resolve_column(users_table, [c for c in gp_candidates if c])
-        username_col = resolve_column(users_table, ["username", "user_name", "telegram_username", "name"])
+    if not ok:
+        return "DB contract mismatch: " + "; ".join(errors)
+    return None
 
-        if not points_col or not username_col:
-            return [], (
-                f"В таблице {users_table} нет нужных колонок для лидерборда GP "
-                f"(gp={points_col}, username={username_col}). "
-                "Если GP хранится в отдельной колонке, укажите FM_GP_COLUMN в .env."
-            )
 
+@app.on_event("startup")
+def startup_contract_check() -> None:
+    error = _contract_healthcheck()
+    if error:
+        raise RuntimeError(error)
+
+
+def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
+    try:
+        contract = get_db_contract()
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     f"""
-                    SELECT {username_col}, {points_col}
-                    FROM {users_table}
-                    ORDER BY {points_col} DESC NULLS LAST
+                    SELECT username, rank_name, gp_points
+                    FROM {contract.leaderboard_view}
+                    ORDER BY gp_points DESC NULLS LAST
                     LIMIT 10
                     """
                 )
                 rows = cur.fetchall()
 
-        result = []
-        for username, points in rows:
-            points_value = int(points or 0)
+        result: list[LeaderboardRow] = []
+        for username, rank_name, gp_points in rows:
             display_username = username or "Пользователь"
             if not str(display_username).startswith("@"):
                 display_username = f"@{display_username}"
+
             result.append(
-                {
-                    "username": display_username,
-                    "points": points_value,
-                    "rank_name": _rank_name(points_value),
-                }
+                LeaderboardRow(
+                    username=display_username,
+                    rank_name=rank_name or "—",
+                    points=int(gp_points or 0),
+                )
             )
         return result, None
     except Exception as exc:
         return [], f"Не удалось загрузить лидерборд: {exc}"
 
 
-def _load_achievements() -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+def _load_achievements() -> tuple[list[AchievementRow], list[AchievementRow], str | None]:
     try:
-        table_map = resolve_table_mapping()
-        achievements_table = table_map["achievements"]
-
-        id_col = resolve_column(achievements_table, ["id", "achievement_id"])
-        name_col = resolve_column(achievements_table, ["name", "title", "achievement_name"])
-        desc_col = resolve_column(achievements_table, ["description", "desc", "text"])
-        reward_col = resolve_column(achievements_table, ["reward_points", "points", "reward"])
-        seasonal_col = resolve_column(
-            achievements_table,
-            ["is_seasonal", "seasonal", "is_temporary", "is_event", "season_type", "type"],
-        )
-
-        if not id_col or not name_col:
-            return [], [], f"В таблице {achievements_table} нет обязательных колонок id/name."
-
-        select_parts = [id_col, name_col]
-        select_parts.append(desc_col if desc_col else "NULL")
-        select_parts.append(reward_col if reward_col else "0")
-        select_parts.append(seasonal_col if seasonal_col else "NULL")
-
+        contract = get_db_contract()
         with get_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT {', '.join(select_parts)} FROM {achievements_table} ORDER BY {name_col}"
+                    f"""
+                    SELECT achievement_id, name, description, reward_points, is_seasonal
+                    FROM {contract.achievements_view}
+                    ORDER BY name
+                    """
                 )
                 rows = cur.fetchall()
 
-        permanent, seasonal = [], []
-        for ach_id, name, description, reward_points, seasonal_raw in rows:
-            item = {
-                "id": ach_id,
-                "name": name,
-                "description": description,
-                "reward_points": int(reward_points or 0),
-            }
-            if _is_truthy_seasonal(seasonal_raw):
+        permanent: list[AchievementRow] = []
+        seasonal: list[AchievementRow] = []
+        for achievement_id, name, description, reward_points, is_seasonal in rows:
+            item = AchievementRow(
+                achievement_id=str(achievement_id),
+                name=name or "Без названия",
+                description=description,
+                reward_points=int(reward_points or 0),
+                is_seasonal=bool(is_seasonal),
+            )
+            if item.is_seasonal:
                 seasonal.append(item)
             else:
                 permanent.append(item)

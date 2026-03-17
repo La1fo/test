@@ -1,4 +1,4 @@
-"""Проверка подключения к уже созданной базе FriendlyMap в PostgreSQL."""
+"""Проверка готовности read-only DB contract для сайта FriendlyMap."""
 
 from urllib.parse import urlsplit
 
@@ -14,32 +14,9 @@ def _safe_db_url(db_url: str) -> str:
     return f"{parts.scheme}://{user}:***@{host}{port}{parts.path}"
 
 
-def _load_db_api():
-    try:
-        from .database import BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
-    except ModuleNotFoundError:
-        raise
-    except ImportError:
-        from database import BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
-    return BOT_DB_URL, DB_READ_ONLY, resolve_table_mapping
-
-
-def _print_connection_help(error_text: str) -> None:
-    print("❌ Не удалось подключиться к PostgreSQL.")
-
-    if "password authentication failed" in error_text:
-        print("Причина: неверный логин/пароль PostgreSQL.")
-    elif "Connection refused" in error_text:
-        print("Причина: PostgreSQL не запущен или недоступен на указанном хосте/порте.")
-    elif "does not exist" in error_text:
-        print("Причина: указанная база данных не существует.")
-
-    print("Проверьте DATABASE_URL или POSTGRES_HOST/PORT/DB/USER/PASSWORD в .env.")
-
-
 def main() -> int:
     try:
-        BOT_DB_URL, db_read_only, resolve_table_mapping = _load_db_api()
+        from .database import BOT_DB_URL, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
         print(f"Причина: {exc}")
@@ -47,22 +24,29 @@ def main() -> int:
         print("python3 -m pip install -r requirements.txt")
         return 1
 
+    contract = get_db_contract()
     print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
-    print(f"Режим БД: {'read-only' if db_read_only else 'read-write'}")
+    print(f"Режим БД: {'read-only' if DB_READ_ONLY else 'read-write'}")
+    print(f"Legacy compatibility: {'on' if LEGACY_SCHEMA_COMPAT else 'off'}")
+    print("Ожидаемые VIEW контракта:")
+    print(f"- leaderboard: {contract.leaderboard_view}")
+    print(f"- public_users: {contract.public_users_view}")
+    print(f"- public_locations: {contract.public_locations_view}")
+    print(f"- achievements: {contract.achievements_view}")
 
     try:
-        table_map = resolve_table_mapping()
-        print("✅ Найдены таблицы FriendlyMap:")
-        print(f"- users: {table_map['users']}")
-        print(f"- achievements: {table_map['achievements']}")
-        print(f"- user_achievements: {table_map['user_achievements']}")
-        return 0
+        ok, errors = validate_db_contract()
+        if ok:
+            print("✅ DB contract валиден")
+            return 0
 
-    except RuntimeError as exc:
-        print(f"❌ {exc}")
+        print("❌ DB contract невалиден:")
+        for err in errors:
+            print(f"  - {err}")
         return 1
     except Exception as exc:
-        _print_connection_help(str(exc))
+        print("❌ Не удалось проверить DB contract.")
+        print(exc)
         return 1
 
 

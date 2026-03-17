@@ -2,6 +2,7 @@ import importlib
 import os
 import re
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
 from urllib.parse import quote_plus
@@ -11,6 +12,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
+
+
+@dataclass(frozen=True)
+class DBContract:
+    leaderboard_view: str
+    public_users_view: str
+    public_locations_view: str
+    achievements_view: str
+
+
+def _bool_env(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _assert_identifier(name: str) -> str:
+    if not name or not _IDENTIFIER_RE.match(name):
+        raise RuntimeError(f"Некорректное SQL-имя объекта: {name!r}")
+    return name
 
 
 def _build_postgres_dsn() -> str:
@@ -27,32 +49,29 @@ def _build_postgres_dsn() -> str:
 
 
 BOT_DB_URL = _build_postgres_dsn()
-DB_READ_ONLY = os.getenv("DB_READ_ONLY", "1").strip() in {"1", "true", "True", "yes", "on"}
+DB_READ_ONLY = _bool_env("DB_READ_ONLY", True)
+LEGACY_SCHEMA_COMPAT = _bool_env("LEGACY_SCHEMA_COMPAT", False)
 
-TABLE_CANDIDATES = {
-    "users": [
-        os.getenv("FM_USERS_TABLE", "").strip(),
-        "website_users",
-        "users",
-        "fm_users",
-    ],
-    "achievements": [
-        os.getenv("FM_ACHIEVEMENTS_TABLE", "").strip(),
-        "website_achievements",
-        "achievements",
-        "fm_achievements",
-    ],
-    "user_achievements": [
-        os.getenv("FM_USER_ACHIEVEMENTS_TABLE", "").strip(),
-        "website_user_achievements",
-        "user_achievements",
-        "fm_user_achievements",
-    ],
-}
+
+def get_db_contract() -> DBContract:
+    """Явный read-only контракт между writer (ботом) и reader (сайтом)."""
+    return DBContract(
+        leaderboard_view=_assert_identifier(
+            os.getenv("SITE_LEADERBOARD_VIEW", "site_leaderboard").strip()
+        ),
+        public_users_view=_assert_identifier(
+            os.getenv("SITE_PUBLIC_USERS_VIEW", "site_public_users").strip()
+        ),
+        public_locations_view=_assert_identifier(
+            os.getenv("SITE_PUBLIC_LOCATIONS_VIEW", "site_public_locations").strip()
+        ),
+        achievements_view=_assert_identifier(
+            os.getenv("SITE_ACHIEVEMENTS_VIEW", "site_achievements_overview").strip()
+        ),
+    )
 
 
 def _load_postgres_driver() -> Any:
-    """Пытается загрузить драйвер PostgreSQL (psycopg2 или psycopg)."""
     for module_name in ("psycopg2", "psycopg"):
         try:
             return importlib.import_module(module_name)
@@ -81,52 +100,63 @@ def get_connection(dict_cursor: bool = False):
         conn.close()
 
 
-def _assert_identifier(name: str) -> str:
-    if not name or not _IDENTIFIER_RE.match(name):
-        raise RuntimeError(f"Некорректное имя таблицы: {name!r}")
-    return name
+def _view_columns(cur, view_name: str) -> set[str]:
+    cur.execute(
+        """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=%s
+        """,
+        (view_name,),
+    )
+    return {row[0] for row in cur.fetchall()}
 
 
-def _table_exists(cur, table_name: str) -> bool:
+def _view_exists(cur, view_name: str) -> bool:
     cur.execute(
         """
         SELECT 1
-        FROM information_schema.tables
-        WHERE table_schema = 'public' AND table_name = %s
+        FROM information_schema.views
+        WHERE table_schema='public' AND table_name=%s
         LIMIT 1
         """,
-        (table_name,),
+        (view_name,),
     )
     return cur.fetchone() is not None
 
 
-@lru_cache(maxsize=1)
-def resolve_table_mapping() -> dict[str, str]:
-    """Определяет имена таблиц в уже существующей FriendlyMap DB."""
-    mapping: dict[str, str] = {}
-    missing: dict[str, list[str]] = {}
+REQUIRED_COLUMNS = {
+    "leaderboard": {"user_id", "username", "gp_points", "rank_name"},
+    "public_users": {"user_id", "username"},
+    "public_locations": {"location_id", "user_id"},
+    "achievements": {"achievement_id", "name", "reward_points", "is_seasonal"},
+}
+
+
+def validate_db_contract() -> tuple[bool, list[str]]:
+    contract = get_db_contract()
+    errors: list[str] = []
 
     with get_connection() as conn:
         with conn.cursor() as cur:
-            for logical_name, candidates in TABLE_CANDIDATES.items():
-                normalized = [_assert_identifier(c) for c in candidates if c]
-                for candidate in normalized:
-                    if _table_exists(cur, candidate):
-                        mapping[logical_name] = candidate
-                        break
-                if logical_name not in mapping:
-                    missing[logical_name] = normalized
+            for key, view_name in (
+                ("leaderboard", contract.leaderboard_view),
+                ("public_users", contract.public_users_view),
+                ("public_locations", contract.public_locations_view),
+                ("achievements", contract.achievements_view),
+            ):
+                if not _view_exists(cur, view_name):
+                    errors.append(f"view '{view_name}' отсутствует")
+                    continue
 
-    if missing:
-        details = "; ".join(
-            f"{logical}: tried {', '.join(cands)}" for logical, cands in missing.items()
-        )
-        raise RuntimeError(
-            "Не удалось найти нужные таблицы в существующей БД FriendlyMap. "
-            f"{details}. Укажите точные имена через FM_*_TABLE в .env"
-        )
+                cols = _view_columns(cur, view_name)
+                missing = REQUIRED_COLUMNS[key] - cols
+                if missing:
+                    errors.append(
+                        f"view '{view_name}' не содержит колонки: {', '.join(sorted(missing))}"
+                    )
 
-    return mapping
+    return len(errors) == 0, errors
 
 
 def execute(query: str, params: tuple | None = None) -> None:
@@ -150,6 +180,49 @@ def fetchall(query: str, params: tuple | None = None, dict_cursor: bool = False)
             return cur.fetchall()
 
 
+# --- Legacy compatibility (explicit opt-in only) ---
+LEGACY_TABLE_CANDIDATES = {
+    "users": ["website_users", "users", "fm_users"],
+    "achievements": ["website_achievements", "achievements", "fm_achievements"],
+    "user_achievements": ["website_user_achievements", "user_achievements", "fm_user_achievements"],
+}
+
+
+def _table_exists(cur, table_name: str) -> bool:
+    cur.execute(
+        """
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema='public' AND table_name=%s
+        LIMIT 1
+        """,
+        (table_name,),
+    )
+    return cur.fetchone() is not None
+
+
+@lru_cache(maxsize=1)
+def resolve_table_mapping() -> dict[str, str]:
+    if not LEGACY_SCHEMA_COMPAT:
+        raise RuntimeError(
+            "Legacy schema mapping отключён. Используйте контрактные VIEW (site_*). "
+            "Для временной совместимости установите LEGACY_SCHEMA_COMPAT=1"
+        )
+
+    mapping: dict[str, str] = {}
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            for logical_name, candidates in LEGACY_TABLE_CANDIDATES.items():
+                for candidate in candidates:
+                    if _table_exists(cur, candidate):
+                        mapping[logical_name] = candidate
+                        break
+                if logical_name not in mapping:
+                    raise RuntimeError(f"Legacy таблица для '{logical_name}' не найдена")
+
+    return mapping
+
+
 @lru_cache(maxsize=16)
 def get_table_columns(table_name: str) -> set[str]:
     table_name = _assert_identifier(table_name)
@@ -167,6 +240,10 @@ def get_table_columns(table_name: str) -> set[str]:
 
 
 def resolve_column(table_name: str, candidates: list[str]) -> str | None:
+    if not LEGACY_SCHEMA_COMPAT:
+        raise RuntimeError(
+            "Legacy column resolve отключён. Используйте фиксированные колонки контрактных VIEW."
+        )
     columns = get_table_columns(table_name)
     for candidate in candidates:
         if candidate in columns:

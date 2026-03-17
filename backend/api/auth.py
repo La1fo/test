@@ -2,22 +2,13 @@ import os
 
 from fastapi import APIRouter, Body, HTTPException
 
-from ..database import DB_READ_ONLY, get_connection, resolve_table_mapping
+from ..database import get_connection, get_db_contract
 from ..schemas import TelegramAuthPayload, UserCreate
-from ..security import (
-    create_access_token,
-    get_password_hash,
-    verify_password,
-    verify_telegram_auth,
-)
+from ..security import create_access_token, verify_password, verify_telegram_auth
 
 router = APIRouter()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-
-
-def _tables() -> dict[str, str]:
-    return resolve_table_mapping()
 
 
 @router.post("/telegram")
@@ -28,33 +19,21 @@ def login_telegram(payload: TelegramAuthPayload):
         raise HTTPException(status_code=400, detail="Invalid Telegram auth")
 
     telegram_id = int(data["id"])
-    username = data.get("username") or f"user{str(telegram_id)[-4:]}"
-    users_table = _tables()["users"]
+    users_view = get_db_contract().public_users_view
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT id FROM {users_table} WHERE telegram_id = %s",
+                f"SELECT user_id FROM {users_view} WHERE telegram_id = %s",
                 (telegram_id,),
             )
             row = cur.fetchone()
 
-            if row is None:
-                if DB_READ_ONLY:
-                    raise HTTPException(
-                        status_code=403,
-                        detail="User does not exist in read-only DB. Create user in source FriendlyMap DB.",
-                    )
-                cur.execute(
-                    f"""
-                    INSERT INTO {users_table} (telegram_id, username)
-                    VALUES (%s, %s)
-                    RETURNING id
-                    """,
-                    (telegram_id, username),
-                )
-                row = cur.fetchone()
-                conn.commit()
+    if row is None:
+        raise HTTPException(
+            status_code=403,
+            detail="User does not exist in shared FriendlyMap DB. Registration is handled by writer services.",
+        )
 
     user_id = row[0]
     access_token = create_access_token(data={"sub": str(user_id)})
@@ -63,38 +42,21 @@ def login_telegram(payload: TelegramAuthPayload):
 
 @router.post("/email/register")
 def register_email(user: UserCreate):
-    if DB_READ_ONLY:
-        raise HTTPException(status_code=403, detail="Registration disabled: database is read-only")
-
-    users_table = _tables()["users"]
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(f"SELECT 1 FROM {users_table} WHERE email = %s", (user.email,))
-            if cur.fetchone() is not None:
-                raise HTTPException(status_code=400, detail="Email already registered")
-
-            hashed_pw = get_password_hash(user.password)
-            cur.execute(
-                f"""
-                INSERT INTO {users_table} (email, username, hashed_password)
-                VALUES (%s, %s, %s)
-                """,
-                (user.email, user.username, hashed_pw),
-            )
-        conn.commit()
-
-    return {"msg": "User created"}
+    _ = user
+    raise HTTPException(
+        status_code=403,
+        detail="Registration is disabled on site reader service. Use writer-side registration flow.",
+    )
 
 
 @router.post("/email/login")
 def login_email(email: str = Body(...), password: str = Body(...)):
-    users_table = _tables()["users"]
+    users_view = get_db_contract().public_users_view
 
     with get_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                f"SELECT id, hashed_password FROM {users_table} WHERE email = %s",
+                f"SELECT user_id, hashed_password FROM {users_view} WHERE email = %s",
                 (email,),
             )
             row = cur.fetchone()

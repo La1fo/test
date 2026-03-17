@@ -1,42 +1,32 @@
-# Security review (FriendlyMap)
+# Security review (FriendlyMap Site Reader)
 
 ## Scope checked
 - Backend Python code in `backend/`.
 - Configuration in `.env` and dependency pins in `requirements.txt`.
-- Frontend static templates in `frontend/`.
+- Frontend templates in `frontend/`.
 
-## High-risk issues found and fixed
-1. **Unsafe/default JWT secret usage**
-   - Risk: predictable default key allows token forgery.
-   - Fix: `backend/security.py` now requires `SECRET_KEY` of at least 32 chars and fails fast if not configured.
+## Key security decisions
+1. **Strict DB read-only architecture**
+   - Site is designed as reader-only service over shared FriendlyMap DB.
+   - Primary integration path is explicit SQL VIEW contract (`site_*`), not direct writes.
 
-2. **Telegram auth signature verification weaknesses**
-   - Risk: replay attacks and timing attacks in hash compare.
-   - Fix: `verify_telegram_auth` now:
-     - validates payload as dict,
-     - enforces `auth_date` freshness (10 minutes),
-     - uses `hmac.compare_digest` for constant-time comparison,
-     - avoids mutating input payload.
+2. **No schema guessing in primary mode**
+   - Main mode validates explicit DB contract and fails fast if missing/incompatible.
+   - Legacy schema guessing exists only behind `LEGACY_SCHEMA_COMPAT=1`.
 
-3. **Broken auth endpoint models / runtime errors**
-   - Risk: auth endpoints could fail unexpectedly (undefined variables and wrong model import), potentially exposing stack traces.
-   - Fix: corrected payload handling in `backend/api/auth.py`, replaced unknown `User` with `WebsiteUser`, and added typed Telegram payload schema.
+3. **Auth secret and token hardening**
+   - `SECRET_KEY` must be at least 32 chars.
+   - Token signing and password verification use constant-time comparisons.
 
-4. **Weak input validation for registration**
-   - Risk: invalid email / overly short passwords accepted.
-   - Fix: `backend/schemas.py` now validates email format and enforces sensible bounds for username/password.
+4. **Telegram auth validation hardening**
+   - Payload signature validated with HMAC.
+   - `auth_date` freshness check blocks replay attempts.
 
-5. **Database auth misconfiguration visibility**
-   - Risk: startup/init failures with unclear troubleshooting.
-   - Fix: `backend/init_db.py` now prints sanitized DB URL and human-readable PostgreSQL diagnostics for common failures.
+## Contract and startup safety
+- Startup contract check validates required `site_*` VIEW and required columns.
+- On contract mismatch, service returns explicit diagnostics rather than silent fallbacks.
 
-## PostgreSQL readiness
-- Database URL resolution now prioritizes `DATABASE_URL`/`DB_URL`, otherwise builds PostgreSQL DSN from `POSTGRES_*` variables.
-- Прямое подключение через `psycopg2` использует централизованный DSN и явную обработку ошибок подключения.
-
-## Additional recommendations (not auto-fixed)
-- Add rate limiting for `/email/login` and `/telegram` endpoints to mitigate brute-force attacks.
-- Add account lockout/backoff policy on repeated failed logins.
-- Add HTTPS-only cookie session strategy if browser auth is used.
-- Add CI security checks (`pip-audit`, `bandit`, and SAST) and dependency update workflow.
-- Do not commit real secrets into `.env` in production; use environment/secret manager.
+## Additional recommendations
+- Keep DB role minimal (`SELECT` only on contract VIEW).
+- Add CI checks for tests + security linting.
+- Keep production secrets in secret manager, not in repository.
