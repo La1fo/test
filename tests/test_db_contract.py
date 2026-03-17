@@ -4,6 +4,19 @@ from contextlib import contextmanager
 from backend import database
 
 
+VIEWS_QUERY = """
+        SELECT 1
+        FROM information_schema.views
+        WHERE table_schema='public' AND table_name=%s
+        LIMIT 1
+        """
+COLUMNS_QUERY = """
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema='public' AND table_name=%s
+        """
+
+
 class FakeCursor:
     def __init__(self, scripted_results):
         self.scripted_results = scripted_results
@@ -26,9 +39,7 @@ class FakeCursor:
         value = self.scripted_results.get(key, [])
         if value is None:
             return []
-        if isinstance(value, list):
-            return value
-        return [value]
+        return value if isinstance(value, list) else [value]
 
     def __enter__(self):
         return self
@@ -51,143 +62,97 @@ class FakeConnection:
         return False
 
 
-def _views_queries(contract):
-    return [
-        ("leaderboard", contract.leaderboard_view),
-        ("public_users", contract.public_users_view),
-        ("public_locations", contract.public_locations_view),
-        ("achievements", contract.achievements_view),
-        ("auth_users", contract.auth_users_view),
-    ]
-
-
 class TestDBContractValidation(unittest.TestCase):
-    def _build_scripted_success(self, contract):
-        scripted = {}
-        for _, view in _views_queries(contract):
-            scripted[(
-                """
-        SELECT 1
-        FROM information_schema.views
-        WHERE table_schema='public' AND table_name=%s
-        LIMIT 1
-        """,
-                (view,),
-            )] = (1,)
+    def setUp(self):
+        self.contract = database.DBContract(
+            "site_leaderboard",
+            "site_public_users",
+            "site_public_locations",
+            "site_achievements_overview",
+            "site_auth_users",
+        )
 
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.leaderboard_view,),
-        )] = [
+    def _build_scripted_success(self):
+        scripted = {}
+
+        for view in (
+            self.contract.leaderboard_view,
+            self.contract.public_users_view,
+            self.contract.public_locations_view,
+            self.contract.achievements_view,
+            self.contract.auth_users_view,
+        ):
+            scripted[(VIEWS_QUERY, (view,))] = (1,)
+
+        scripted[(COLUMNS_QUERY, (self.contract.leaderboard_view,))] = [
             ("user_id",), ("username",), ("total_gp",), ("rank_level",),
             ("gp_in_rank",), ("rank_name",), ("position",),
         ]
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.public_users_view,),
-        )] = [
+        scripted[(COLUMNS_QUERY, (self.contract.public_users_view,))] = [
             ("user_id",), ("username",), ("telegram_id",), ("total_gp",),
             ("rank_level",), ("gp_in_rank",), ("rank_name",), ("approved_locations",),
         ]
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.public_locations_view,),
-        )] = [("location_id",), ("user_id",)]
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.achievements_view,),
-        )] = [
+        scripted[(COLUMNS_QUERY, (self.contract.public_locations_view,))] = [
+            ("location_id",), ("user_id",),
+        ]
+        scripted[(COLUMNS_QUERY, (self.contract.achievements_view,))] = [
             ("achievement_id",), ("code",), ("name",), ("description",),
             ("completed_count",), ("is_seasonal",),
         ]
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.auth_users_view,),
-        )] = [
+        scripted[(COLUMNS_QUERY, (self.contract.auth_users_view,))] = [
             ("user_id",), ("username",), ("telegram_id",), ("email",), ("hashed_password",),
         ]
         return scripted
 
+    def _run_validation_with_script(self, scripted):
+        cursor = FakeCursor(scripted)
+
+        @contextmanager
+        def fake_get_connection(dict_cursor=False):
+            _ = dict_cursor
+            yield FakeConnection(cursor)
+
+        old_contract = database.get_db_contract
+        old_connection = database.get_connection
+        try:
+            database.get_db_contract = lambda: self.contract
+            database.get_connection = fake_get_connection
+            return database.validate_db_contract()
+        finally:
+            database.get_db_contract = old_contract
+            database.get_connection = old_connection
+
     def test_validate_db_contract_success(self):
-        contract = database.DBContract(
-            "site_leaderboard", "site_public_users", "site_public_locations", "site_achievements_overview", "site_auth_users"
-        )
-        scripted = self._build_scripted_success(contract)
-        cursor = FakeCursor(scripted)
+        ok, errors = self._run_validation_with_script(self._build_scripted_success())
+        self.assertTrue(ok)
+        self.assertEqual(errors, [])
 
-        @contextmanager
-        def fake_get_connection(dict_cursor=False):
-            _ = dict_cursor
-            yield FakeConnection(cursor)
+    def test_failure_on_missing_site_auth_users(self):
+        scripted = self._build_scripted_success()
+        scripted[(VIEWS_QUERY, (self.contract.auth_users_view,))] = None
+        ok, errors = self._run_validation_with_script(scripted)
+        self.assertFalse(ok)
+        self.assertTrue(any(self.contract.auth_users_view in err for err in errors))
 
-        old_contract = database.get_db_contract
-        old_connection = database.get_connection
-        try:
-            database.get_db_contract = lambda: contract
-            database.get_connection = fake_get_connection
-            ok, errors = database.validate_db_contract()
-            self.assertTrue(ok)
-            self.assertEqual(errors, [])
-        finally:
-            database.get_db_contract = old_contract
-            database.get_connection = old_connection
-
-    def test_validate_db_contract_failure_missing_columns(self):
-        contract = database.DBContract(
-            "site_leaderboard", "site_public_users", "site_public_locations", "site_achievements_overview", "site_auth_users"
-        )
-        scripted = self._build_scripted_success(contract)
-        # remove required leaderboard column 'position'
-        scripted[(
-            """
-        SELECT column_name
-        FROM information_schema.columns
-        WHERE table_schema='public' AND table_name=%s
-        """,
-            (contract.leaderboard_view,),
-        )] = [
+    def test_failure_on_missing_telegram_id_in_site_public_users(self):
+        scripted = self._build_scripted_success()
+        scripted[(COLUMNS_QUERY, (self.contract.public_users_view,))] = [
             ("user_id",), ("username",), ("total_gp",), ("rank_level",),
-            ("gp_in_rank",), ("rank_name",),
+            ("gp_in_rank",), ("rank_name",), ("approved_locations",),
         ]
+        ok, errors = self._run_validation_with_script(scripted)
+        self.assertFalse(ok)
+        self.assertTrue(any("telegram_id" in err for err in errors))
 
-        cursor = FakeCursor(scripted)
-
-        @contextmanager
-        def fake_get_connection(dict_cursor=False):
-            _ = dict_cursor
-            yield FakeConnection(cursor)
-
-        old_contract = database.get_db_contract
-        old_connection = database.get_connection
-        try:
-            database.get_db_contract = lambda: contract
-            database.get_connection = fake_get_connection
-            ok, errors = database.validate_db_contract()
-            self.assertFalse(ok)
-            self.assertTrue(any("position" in e for e in errors))
-        finally:
-            database.get_db_contract = old_contract
-            database.get_connection = old_connection
+    def test_failure_on_missing_description_in_achievements(self):
+        scripted = self._build_scripted_success()
+        scripted[(COLUMNS_QUERY, (self.contract.achievements_view,))] = [
+            ("achievement_id",), ("code",), ("name",),
+            ("completed_count",), ("is_seasonal",),
+        ]
+        ok, errors = self._run_validation_with_script(scripted)
+        self.assertFalse(ok)
+        self.assertTrue(any("description" in err for err in errors))
 
     def test_legacy_mode_disabled_by_default(self):
         self.assertFalse(database.LEGACY_SCHEMA_COMPAT)

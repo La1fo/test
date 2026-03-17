@@ -130,9 +130,9 @@ def _view_exists(cur, view_name: str) -> bool:
 
 REQUIRED_COLUMNS = {
     "leaderboard": {"user_id", "username", "total_gp", "rank_level", "gp_in_rank", "rank_name", "position"},
-    "public_users": {"user_id", "username", "total_gp", "rank_level", "gp_in_rank", "rank_name", "approved_locations"},
+    "public_users": {"user_id", "username", "telegram_id", "total_gp", "rank_level", "gp_in_rank", "rank_name", "approved_locations"},
     "public_locations": {"location_id", "user_id"},
-    "achievements": {"achievement_id", "code", "name", "completed_count", "is_seasonal"},
+    "achievements": {"achievement_id", "code", "name", "description", "completed_count", "is_seasonal"},
     "auth_users": {"user_id", "username", "telegram_id", "email", "hashed_password"},
 }
 

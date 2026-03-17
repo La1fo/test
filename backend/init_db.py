@@ -27,6 +27,7 @@ def main() -> int:
     contract = get_db_contract()
     print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
     print(f"Режим БД: {'read-only' if DB_READ_ONLY else 'read-write'}")
+    print(f"Schema mode: {'legacy-compat' if LEGACY_SCHEMA_COMPAT else 'strict-contract'}")
     print(f"Legacy compatibility: {'on' if LEGACY_SCHEMA_COMPAT else 'off'}")
     print("Ожидаемые VIEW контракта:")
     print(f"- leaderboard: {contract.leaderboard_view}")

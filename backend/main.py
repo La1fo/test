@@ -53,12 +53,6 @@ class ProfileRow:
     approved_locations: int
 
 
-def _derive_rank(total_gp: int) -> tuple[int, int, str]:
-    rank_level = (total_gp // 100) + 1
-    gp_in_rank = total_gp % 100
-    return rank_level, gp_in_rank, f"Ранг {rank_level}"
-
-
 def _contract_healthcheck() -> str | None:
     try:
         ok, errors = validate_db_contract()
@@ -96,7 +90,7 @@ def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
         for user_id, username, total_gp, rank_level, gp_in_rank, rank_name, position in rows:
             total_gp = int(total_gp or 0)
             if rank_level is None or gp_in_rank is None or not rank_name:
-                rank_level, gp_in_rank, rank_name = _derive_rank(total_gp)
+                raise RuntimeError("Contract violation: rank fields must be provided by leaderboard view")
 
             display_username = username or "Пользователь"
             if not str(display_username).startswith("@"):
@@ -175,7 +169,7 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
         user_id, username, total_gp, rank_level, gp_in_rank, rank_name, approved_locations = row
         total_gp = int(total_gp or 0)
         if rank_level is None or gp_in_rank is None or not rank_name:
-            rank_level, gp_in_rank, rank_name = _derive_rank(total_gp)
+            raise RuntimeError("Contract violation: rank fields must be provided by public users view")
 
         return (
             ProfileRow(
