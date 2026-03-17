@@ -129,16 +129,18 @@
           <th>#</th>
           <th>Аккаунт</th>
           <th>Ранг</th>
-          <th>GP</th>
+          <th>GP в ранге</th>
+          <th>Общий GP</th>
         </tr>
       </thead>
       <tbody>
         {% for row in leaderboard_rows %}
         <tr>
-          <td class="rank-num">{{ loop.index }}</td>
+          <td class="rank-num">{{ row.position }}</td>
           <td class="username">{{ row.username }}</td>
           <td class="user-rank">{{ row.rank_name }}</td>
-          <td class="points">{{ row.points }}</td>
+          <td class="points">{{ row.gp_in_rank }}/100</td>
+          <td class="points">{{ row.total_gp }}</td>
         </tr>
         {% endfor %}
       </tbody>

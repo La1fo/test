@@ -20,6 +20,7 @@ class DBContract:
     public_users_view: str
     public_locations_view: str
     achievements_view: str
+    auth_users_view: str
 
 
 def _bool_env(name: str, default: bool = False) -> bool:
@@ -54,7 +55,6 @@ LEGACY_SCHEMA_COMPAT = _bool_env("LEGACY_SCHEMA_COMPAT", False)
 
 
 def get_db_contract() -> DBContract:
-    """Явный read-only контракт между writer (ботом) и reader (сайтом)."""
     return DBContract(
         leaderboard_view=_assert_identifier(
             os.getenv("SITE_LEADERBOARD_VIEW", "site_leaderboard").strip()
@@ -67,6 +67,9 @@ def get_db_contract() -> DBContract:
         ),
         achievements_view=_assert_identifier(
             os.getenv("SITE_ACHIEVEMENTS_VIEW", "site_achievements_overview").strip()
+        ),
+        auth_users_view=_assert_identifier(
+            os.getenv("SITE_AUTH_USERS_VIEW", "site_auth_users").strip()
         ),
     )
 
@@ -126,10 +129,11 @@ def _view_exists(cur, view_name: str) -> bool:
 
 
 REQUIRED_COLUMNS = {
-    "leaderboard": {"user_id", "username", "gp_points", "rank_name"},
-    "public_users": {"user_id", "username"},
+    "leaderboard": {"user_id", "username", "total_gp", "rank_level", "gp_in_rank", "rank_name", "position"},
+    "public_users": {"user_id", "username", "total_gp", "rank_level", "gp_in_rank", "rank_name", "approved_locations"},
     "public_locations": {"location_id", "user_id"},
-    "achievements": {"achievement_id", "name", "reward_points", "is_seasonal"},
+    "achievements": {"achievement_id", "code", "name", "completed_count", "is_seasonal"},
+    "auth_users": {"user_id", "username", "telegram_id", "email", "hashed_password"},
 }
 
 
@@ -144,6 +148,7 @@ def validate_db_contract() -> tuple[bool, list[str]]:
                 ("public_users", contract.public_users_view),
                 ("public_locations", contract.public_locations_view),
                 ("achievements", contract.achievements_view),
+                ("auth_users", contract.auth_users_view),
             ):
                 if not _view_exists(cur, view_name):
                     errors.append(f"view '{view_name}' отсутствует")
@@ -180,7 +185,6 @@ def fetchall(query: str, params: tuple | None = None, dict_cursor: bool = False)
             return cur.fetchall()
 
 
-# --- Legacy compatibility (explicit opt-in only) ---
 LEGACY_TABLE_CANDIDATES = {
     "users": ["website_users", "users", "fm_users"],
     "achievements": ["website_achievements", "achievements", "fm_achievements"],

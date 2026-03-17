@@ -33,6 +33,7 @@ def main() -> int:
     print(f"- public_users: {contract.public_users_view}")
     print(f"- public_locations: {contract.public_locations_view}")
     print(f"- achievements: {contract.achievements_view}")
+    print(f"- auth_users: {contract.auth_users_view}")
 
     try:
         ok, errors = validate_db_contract()

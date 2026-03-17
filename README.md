@@ -1,55 +1,93 @@
 # FriendlyMap Site (Reader Service)
 
-Сайт работает как **read-only сервис** поверх общей БД FriendlyMap.
-Writer-логика (бот/бэкенд) пишет данные, сайт только читает.
+Сайт работает как **reader-only** сервис поверх общей БД FriendlyMap.
+Бот/основной backend — единственные writer-сервисы.
 
-## DB contract (обязательный)
-Сайт ожидает следующие `VIEW` в схеме `public`:
+## Обязательный DB contract (read-only VIEW)
+Сайт ожидает в `public` следующие VIEW:
 
-- `site_leaderboard`
-  - `user_id`, `username`, `gp_points`, `rank_name`
-- `site_public_users`
-  - `user_id`, `username`, `telegram_id`, `email`, `hashed_password`
-- `site_public_locations`
-  - `location_id`, `user_id`
-- `site_achievements_overview`
-  - `achievement_id`, `name`, `description`, `reward_points`, `is_seasonal`
+1. `site_leaderboard`
+   - `user_id`
+   - `username`
+   - `total_gp`
+   - `rank_level`
+   - `gp_in_rank`
+   - `rank_name`
+   - `position`
 
-> Рекомендуется поддерживать эти VIEW в writer-проекте, чтобы сайт не зависел от внутренних таблиц бота.
+2. `site_public_users`
+   - `user_id`
+   - `username`
+   - `telegram_id`
+   - `total_gp`
+   - `rank_level`
+   - `gp_in_rank`
+   - `rank_name`
+   - `approved_locations`
 
-## Роль БД
-Используйте отдельную роль только для чтения, например `friendly_site_ro`:
+3. `site_public_locations`
+   - `location_id`
+   - `user_id`
+
+4. `site_achievements_overview`
+   - `achievement_id`
+   - `code`
+   - `name`
+   - `description`
+   - `completed_count`
+   - `is_seasonal`
+
+5. `site_auth_users`
+   - `user_id`
+   - `username`
+   - `telegram_id`
+   - `email`
+   - `hashed_password`
+
+## Каноническая ранговая система
+Источник истины — `total_gp`.
+
+Формула:
+- `rank_level = floor(total_gp / 100) + 1`
+- `gp_in_rank = total_gp % 100`
+- `rank_name = "Ранг {rank_level}"`
+
+Пример:
+- `total_gp=99` → `Ранг 1`, `99 GP`
+- `total_gp=102` → `Ранг 2`, `2 GP`
+
+## Роль БД (минимальные права)
+Рекомендуемая роль сайта: `friendly_site_ro`
 - `CONNECT` к БД
-- `USAGE` на схему `public`
+- `USAGE` на `public`
 - `SELECT` только на `site_*` VIEW
 
 ## Запуск
-1. Создайте venv:
+1. Создать venv:
    ```bash
    python3 -m venv .venv
    source .venv/bin/activate
    ```
-2. Установите зависимости:
+2. Установить зависимости:
    ```bash
    python3 -m pip install -r requirements.txt
    ```
-3. Заполните `.env`.
-4. Проверьте контракт:
+3. Заполнить `.env`.
+4. Проверить контракт:
    ```bash
    python3 -m backend.init_db
    ```
-5. Запустите сайт:
+5. Запустить сайт:
    ```bash
    python3 -m backend.main
    ```
 
 ## Legacy compatibility
-По умолчанию **выключено**.
+По умолчанию отключён:
+- `LEGACY_SCHEMA_COMPAT=0` — строгий контрактный режим
+- `LEGACY_SCHEMA_COMPAT=1` — временный fallback legacy-маппинга (только миграция)
 
-- `LEGACY_SCHEMA_COMPAT=0` — строгий контракт через `site_*` VIEW (рекомендуется)
-- `LEGACY_SCHEMA_COMPAT=1` — временный fallback угадывания схемы (только для миграции)
-
-## Безопасность
-- `SECRET_KEY` должен быть минимум 32 символа.
-- Не храните реальные секреты в git.
-- Сайт не должен выполнять write-операции в бизнес-таблицы FriendlyMap.
+## Ограничения read-only режима
+- Сайт не пишет в shared бизнес-данные.
+- Email registration на reader-сервисе отключена.
+- Telegram/email login только чтение через `site_auth_users`.
