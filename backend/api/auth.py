@@ -19,7 +19,7 @@ def login_telegram(payload: TelegramAuthPayload):
         raise HTTPException(status_code=400, detail="Invalid Telegram auth")
 
     telegram_id = int(data["id"])
-    users_view = get_db_contract().public_users_view
+    users_view = get_db_contract().auth_users_view
 
     with get_connection() as conn:
         with conn.cursor() as cur:
@@ -51,7 +51,7 @@ def register_email(user: UserCreate):
 
 @router.post("/email/login")
 def login_email(email: str = Body(...), password: str = Body(...)):
-    users_view = get_db_contract().public_users_view
+    users_view = get_db_contract().auth_users_view
 
     with get_connection() as conn:
         with conn.cursor() as cur:
