@@ -91,3 +91,15 @@
 - Сайт не пишет в shared бизнес-данные.
 - Email registration на reader-сервисе отключена.
 - Telegram/email login только чтение через `site_auth_users`.
+
+## Runtime: какие VIEW использует сайт
+- `/leaderboard` → `site_leaderboard`
+- `/profile/{user_id}` → `site_public_users`
+- `/achievements` → `site_achievements_overview`
+- `/auth/telegram` → `site_auth_users`
+- `/auth/email/login` → `site_auth_users`
+- `/auth/email/register` → отключён на reader-side (`403`)
+
+## Startup diagnostics
+- `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
+- При ошибке контракта выводится конкретная диагностика: отсутствующая VIEW и/или список недостающих колонок.

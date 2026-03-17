@@ -127,6 +127,14 @@ class TestDBContractValidation(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(errors, [])
 
+
+    def test_failure_on_missing_view(self):
+        scripted = self._build_scripted_success()
+        scripted[(VIEWS_QUERY, (self.contract.leaderboard_view,))] = None
+        ok, errors = self._run_validation_with_script(scripted)
+        self.assertFalse(ok)
+        self.assertTrue(any(self.contract.leaderboard_view in err for err in errors))
+
     def test_failure_on_missing_site_auth_users(self):
         scripted = self._build_scripted_success()
         scripted[(VIEWS_QUERY, (self.contract.auth_users_view,))] = None
