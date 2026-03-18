@@ -103,3 +103,20 @@
 ## Startup diagnostics
 - `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
 - При ошибке контракта выводится конкретная диагностика: отсутствующая VIEW и/или список недостающих колонок.
+
+## Release verification steps
+1. Проверить контракт и диагностику старта:
+   ```bash
+   python3 -m backend.init_db
+   ```
+2. Запустить unit-тесты (contract/auth/runtime/rank):
+   ```bash
+   python3 -m unittest discover -s tests -v
+   ```
+3. Запустить сайт и открыть ключевые страницы:
+   - `/leaderboard`
+   - `/profile/{user_id}`
+   - `/achievements`
+4. Проверить auth reader-flow:
+   - `/auth/telegram` и `/auth/email/login` читают только `site_auth_users`
+   - `/auth/email/register` возвращает `403`
