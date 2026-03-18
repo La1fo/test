@@ -85,6 +85,31 @@ class TestMainQueries(unittest.TestCase):
         finally:
             restore()
 
+
+    def test_leaderboard_keeps_writer_rank_name_from_view(self):
+        rows = [(10, "mira", 1450, 11, 400, "⭐ Мастер-картограф", 3)]
+        cursor = FakeCursor(rows)
+        restore = self._patch_connection(cursor)
+        try:
+            result, warning = main._load_leaderboard()
+            self.assertIsNone(warning)
+            self.assertEqual(result[0].rank_name, "⭐ Мастер-картограф")
+            self.assertEqual(result[0].gp_display, "400+/400")
+        finally:
+            restore()
+
+    def test_profile_keeps_writer_rank_name_from_view(self):
+        rows = [(11, "terra", 1300, 11, 400, "⭐ Мастер-картограф", 12)]
+        cursor = FakeCursor(rows)
+        restore = self._patch_connection(cursor)
+        try:
+            profile, warning = main._load_profile(11)
+            self.assertIsNone(warning)
+            self.assertEqual(profile.rank_name, "⭐ Мастер-картограф")
+            self.assertEqual(profile.gp_display, "400/400")
+        finally:
+            restore()
+
     def test_profile_uses_contract_view_and_rank_for_99_gp(self):
         rows = [(7, "neo", 99, 1, 99, "Ранг 1", 3)]
         cursor = FakeCursor(rows)
