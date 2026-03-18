@@ -129,8 +129,8 @@
           <th>#</th>
           <th>Аккаунт</th>
           <th>Ранг</th>
-          <th>GP в ранге</th>
-          <th>Общий GP</th>
+          <th>GP</th>
+          
         </tr>
       </thead>
       <tbody>
@@ -139,8 +139,7 @@
           <td class="rank-num">{{ row.position }}</td>
           <td class="username">{{ row.username }}</td>
           <td class="user-rank">{{ row.rank_name }}</td>
-          <td class="points">{{ row.gp_in_rank }}/100</td>
-          <td class="points">{{ row.total_gp }}</td>
+          <td class="points">{{ row.gp_display }}</td>
         </tr>
         {% endfor %}
       </tbody>

@@ -20,6 +20,21 @@ frontend_path = os.path.join(project_root, "frontend")
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 templates = Jinja2Templates(directory=frontend_path)
 
+WRITER_RANK_NAMES = (
+    "🟢 Исследователь 1",
+    "🟢 Исследователь 2",
+    "🟢 Исследователь 3",
+    "🔵 Путешественник 1",
+    "🔵 Путешественник 2",
+    "🔵 Путешественник 3",
+    "🟡 Первооткрыватель 1",
+    "🟡 Первооткрыватель 2",
+    "🟡 Первооткрыватель 3",
+)
+CARTOGRAPHER_RANK_NAME = "🟣 Картограф"
+MASTER_CARTOGRAPHER_RANK_NAME = "⭐ Мастер-картограф"
+KNOWN_RANK_NAMES = set(WRITER_RANK_NAMES) | {CARTOGRAPHER_RANK_NAME, MASTER_CARTOGRAPHER_RANK_NAME}
+
 
 @dataclass
 class LeaderboardRow:
@@ -30,6 +45,7 @@ class LeaderboardRow:
     total_gp: int
     rank_name: str
     position: int
+    gp_display: str
 
 
 @dataclass
@@ -51,6 +67,32 @@ class ProfileRow:
     gp_in_rank: int
     rank_name: str
     approved_locations: int
+    gp_display: str
+
+
+def _writer_rank_name(total_gp: int, position: int | None = None) -> str:
+    if total_gp >= 1300 and position is not None and position <= 10:
+        return MASTER_CARTOGRAPHER_RANK_NAME
+    if total_gp >= 900:
+        return CARTOGRAPHER_RANK_NAME
+
+    tier_index = min(total_gp // 100, len(WRITER_RANK_NAMES) - 1)
+    return WRITER_RANK_NAMES[tier_index]
+
+
+def _display_rank_name(rank_name: str | None, total_gp: int, position: int | None = None) -> str:
+    normalized = (rank_name or "").strip()
+    if normalized in KNOWN_RANK_NAMES:
+        return normalized
+    return _writer_rank_name(total_gp, position)
+
+
+def _format_gp_display(total_gp: int, gp_in_rank: int, rank_name: str) -> str:
+    if rank_name == MASTER_CARTOGRAPHER_RANK_NAME:
+        return "400+/400" if total_gp > 1300 else "400/400"
+    if rank_name == CARTOGRAPHER_RANK_NAME:
+        return f"{max(0, min(total_gp - 900, 400))}/400"
+    return f"{max(0, min(gp_in_rank, 100))}/100"
 
 
 def _contract_healthcheck() -> str | None:
@@ -89,9 +131,12 @@ def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
         result: list[LeaderboardRow] = []
         for user_id, username, total_gp, rank_level, gp_in_rank, rank_name, position in rows:
             total_gp = int(total_gp or 0)
-            if rank_level is None or gp_in_rank is None or not rank_name:
+            if rank_level is None or gp_in_rank is None:
                 raise RuntimeError("Contract violation: rank fields must be provided by leaderboard view")
 
+            position = int(position)
+            display_rank_name = _display_rank_name(rank_name, total_gp, position)
+            gp_display = _format_gp_display(total_gp, int(gp_in_rank), display_rank_name)
             display_username = username or "Пользователь"
             if not str(display_username).startswith("@"):
                 display_username = f"@{display_username}"
@@ -103,8 +148,9 @@ def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
                     rank_level=int(rank_level),
                     gp_in_rank=int(gp_in_rank),
                     total_gp=total_gp,
-                    rank_name=str(rank_name),
-                    position=int(position),
+                    rank_name=display_rank_name,
+                    position=position,
+                    gp_display=gp_display,
                 )
             )
         return result, None
@@ -168,8 +214,11 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
 
         user_id, username, total_gp, rank_level, gp_in_rank, rank_name, approved_locations = row
         total_gp = int(total_gp or 0)
-        if rank_level is None or gp_in_rank is None or not rank_name:
+        if rank_level is None or gp_in_rank is None:
             raise RuntimeError("Contract violation: rank fields must be provided by public users view")
+
+        display_rank_name = _display_rank_name(rank_name, total_gp)
+        gp_display = _format_gp_display(total_gp, int(gp_in_rank), display_rank_name)
 
         return (
             ProfileRow(
@@ -178,8 +227,9 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
                 total_gp=total_gp,
                 rank_level=int(rank_level),
                 gp_in_rank=int(gp_in_rank),
-                rank_name=str(rank_name),
+                rank_name=display_rank_name,
                 approved_locations=int(approved_locations or 0),
+                gp_display=gp_display,
             ),
             None,
         )

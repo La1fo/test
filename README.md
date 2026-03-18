@@ -92,6 +92,12 @@
 - Email registration на reader-сервисе отключена.
 - Telegram/email login только чтение через `site_auth_users`.
 
+## Отображение рангов на сайте
+- Сайт показывает только `Ранг` и `GP`, без `Общий GP` и без `GP в ранге`.
+- Для рангов 1–9 UI показывает `GP: X/100`.
+- Для `🟣 Картограф` UI показывает `GP: X/400`, где `X = min(total_gp - 900, 400)`.
+- Для `⭐ Мастер-картограф` UI показывает `GP: 400/400` при `total_gp = 1300` и `GP: 400+/400` при `total_gp > 1300`.
+
 ## Runtime: какие VIEW использует сайт
 - `/leaderboard` → `site_leaderboard`
 - `/profile/{user_id}` → `site_public_users`

@@ -69,7 +69,7 @@ class TestMainQueries(unittest.TestCase):
 
         return restore
 
-    def test_load_leaderboard_uses_contract_view(self):
+    def test_load_leaderboard_uses_contract_view_and_new_names(self):
         rows = [(1, "alice", 102, 2, 2, "Ранг 2", 1)]
         cursor = FakeCursor(rows)
         restore = self._patch_connection(cursor)
@@ -80,6 +80,8 @@ class TestMainQueries(unittest.TestCase):
             self.assertEqual(result[0].total_gp, 102)
             self.assertEqual(result[0].rank_level, 2)
             self.assertEqual(result[0].gp_in_rank, 2)
+            self.assertEqual(result[0].rank_name, "🟢 Исследователь 2")
+            self.assertEqual(result[0].gp_display, "2/100")
         finally:
             restore()
 
@@ -93,7 +95,8 @@ class TestMainQueries(unittest.TestCase):
             self.assertIn(f"FROM {self.contract.public_users_view}", cursor.query)
             self.assertEqual(profile.rank_level, 1)
             self.assertEqual(profile.gp_in_rank, 99)
-            self.assertEqual(profile.rank_name, "Ранг 1")
+            self.assertEqual(profile.rank_name, "🟢 Исследователь 1")
+            self.assertEqual(profile.gp_display, "99/100")
         finally:
             restore()
 
@@ -106,10 +109,30 @@ class TestMainQueries(unittest.TestCase):
             self.assertIsNone(warning)
             self.assertEqual(profile.rank_level, 2)
             self.assertEqual(profile.gp_in_rank, 2)
-            self.assertEqual(profile.rank_name, "Ранг 2")
+            self.assertEqual(profile.rank_name, "🟢 Исследователь 2")
             self.assertEqual(profile.total_gp, 102)
+            self.assertEqual(profile.gp_display, "2/100")
         finally:
             restore()
+
+    def test_profile_shows_cartographer_at_900_plus(self):
+        rows = [(9, "atlas", 950, 10, 50, "🟣 Картограф", 7)]
+        cursor = FakeCursor(rows)
+        restore = self._patch_connection(cursor)
+        try:
+            profile, warning = main._load_profile(9)
+            self.assertIsNone(warning)
+            self.assertEqual(profile.rank_name, "🟣 Картограф")
+            self.assertEqual(profile.gp_display, "50/400")
+        finally:
+            restore()
+
+    def test_master_cartographer_only_for_top_10(self):
+        self.assertEqual(main._writer_rank_name(1300, 5), "⭐ Мастер-картограф")
+        self.assertEqual(main._writer_rank_name(1300, 11), "🟣 Картограф")
+        self.assertEqual(main._writer_rank_name(1500, None), "🟣 Картограф")
+        self.assertEqual(main._format_gp_display(1300, 0, "⭐ Мастер-картограф"), "400/400")
+        self.assertEqual(main._format_gp_display(1500, 0, "⭐ Мастер-картограф"), "400+/400")
 
     def test_achievements_uses_contract_view(self):
         rows = [

@@ -36,9 +36,8 @@
       <div class="card">
         <div class="row"><span class="label">Пользователь:</span> @{{ profile.username }}</div>
         <div class="row"><span class="label">Ранг:</span> {{ profile.rank_name }}</div>
-        <div class="row"><span class="label">GP в ранге:</span> {{ profile.gp_in_rank }}/100</div>
-        <div class="row"><span class="label">Общий GP:</span> {{ profile.total_gp }}</div>
-        <div class="row"><span class="label">Подтверждённых локаций:</span> {{ profile.approved_locations }}</div>
+        <div class="row"><span class="label">GP:</span> {{ profile.gp_display }}</div>
+                <div class="row"><span class="label">Подтверждённых локаций:</span> {{ profile.approved_locations }}</div>
       </div>
     {% else %}
       <div class="warning">Профиль не найден.</div>
