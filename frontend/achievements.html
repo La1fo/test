@@ -4,65 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Достижения — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      color: #333;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 20px;
+    .intro-text {
       text-align: center;
-      position: relative;
-      background: url('/static/images/city-bg-full.png') center center / 102% auto no-repeat fixed;
-    }
-    .top-nav {
-      background: rgba(255, 255, 255, 0.92);
-      padding: 14px 30px;
-      border-radius: 50px;
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-      margin: 40px auto 100px;
-      width: 100%;
-      max-width: 700px;
-      z-index: 10;
-    }
-    .top-nav a {
-      text-decoration: none;
-      color: #0077cc;
-      padding: 8px 16px;
-      border-radius: 30px;
-      font-weight: 600;
-      font-size: 1.1rem;
-      transition: all 0.3s ease;
-    }
-    .top-nav a.active,
-    .top-nav a:hover { background: #2997f5; color: #fff; }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 36px;
-      background: white;
-      border-radius: 20px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    h1 { color:#006699; text-align:center; margin-bottom:10px; }
-    .intro-text { text-align:center; color:#666; margin-bottom:24px; }
-    .warning {
-      margin: 0 auto 18px;
-      max-width: 760px;
-      background: #fff4d8;
-      border: 1px solid #ffd46b;
-      color: #7a5b00;
-      border-radius: 10px;
-      padding: 10px 12px;
-      font-size: 0.95rem;
-      text-align: center;
+      color: #5f7284;
+      margin-bottom: 24px;
     }
 
     .achievement-category {
@@ -77,7 +24,12 @@
       position: relative;
       transition: all .2s ease;
     }
-    .achievement-category:hover { background:#eaf3ff; }
+
+    .achievement-category:hover {
+      background: #eaf3ff;
+      transform: translateY(-1px);
+    }
+
     .achievement-category::after {
       content: '+';
       position: absolute;
@@ -87,27 +39,44 @@
       font-size: 20px;
       font-weight: 700;
     }
-    .achievement-category.active::after { content: '−'; }
 
-    .achievement-section { display:none; margin-top:10px; margin-bottom:16px; }
-    .achievement-section.active { display:block; }
+    .achievement-category.active::after {
+      content: '−';
+    }
+
+    .achievement-section {
+      display: none;
+      margin-top: 10px;
+      margin-bottom: 16px;
+    }
+
+    .achievement-section.active {
+      display: block;
+    }
 
     .achievement {
-      background:#fff;
-      border:1px solid #e7edf3;
-      border-left:4px solid #2997f5;
-      border-radius:10px;
-      padding:12px 14px;
-      margin-bottom:8px;
+      background: #fff;
+      border: 1px solid #e7edf3;
+      border-left: 4px solid #2997f5;
+      border-radius: 10px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
-    .ach-title { font-weight:700; color:#1f3b58; }
-    .ach-desc { color:#546575; margin-top:4px; }
-    .ach-reward { margin-top:8px; color:#0b67b2; font-weight:600; }
-    .empty { color:#6b7785; padding:8px 0; }
+
+    .achievement:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    }
+
+    .ach-title { font-weight: 700; color: #1f3b58; }
+    .ach-desc { color: #546575; margin-top: 4px; }
+    .ach-reward { margin-top: 8px; color: #0b67b2; font-weight: 600; }
+    .empty { color: #6b7785; padding: 8px 0; }
   </style>
 </head>
-<body>
-  <nav class="top-nav">
+<body class="site-theme">
+  <nav class="top-nav reveal">
     <a href="/">Главная</a>
     <a href="/achievements" class="active">Достижения</a>
     <a href="/leaderboard">Топ</a>
@@ -115,42 +84,44 @@
     <a href="/login">Вход</a>
   </nav>
 
-  <div class="container">
-    <h1>Достижения</h1>
-    <p class="intro-text">Собирайте баллы, получайте награды и становитесь легендой города.</p>
+  <main class="page-shell">
+    <section class="surface-card">
+      <h1 class="page-title">Достижения</h1>
+      <p class="intro-text">Собирайте баллы, получайте награды и становитесь легендой города.</p>
 
-    {% if db_warning %}
-      <div class="warning">{{ db_warning }}</div>
-    {% endif %}
-
-    <div class="achievement-category active" onclick="toggleSection('permanent')">Постоянные</div>
-    <div id="permanent" class="achievement-section active">
-      {% for ach in permanent_achievements %}
-      <div class="achievement">
-        <div class="ach-title">{{ ach.name }}</div>
-        <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
-        <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
-      </div>
-      {% endfor %}
-      {% if not permanent_achievements %}
-        <div class="empty">Нет постоянных достижений.</div>
+      {% if db_warning %}
+        <div class="warning">{{ db_warning }}</div>
       {% endif %}
-    </div>
 
-    <div class="achievement-category" onclick="toggleSection('seasonal')">Сезонные</div>
-    <div id="seasonal" class="achievement-section">
-      {% for ach in seasonal_achievements %}
-      <div class="achievement">
-        <div class="ach-title">{{ ach.name }}</div>
-        <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
-        <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
+      <div class="achievement-category active" onclick="toggleSection('permanent')">Постоянные</div>
+      <div id="permanent" class="achievement-section active">
+        {% for ach in permanent_achievements %}
+        <div class="achievement reveal">
+          <div class="ach-title">{{ ach.name }}</div>
+          <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
+          <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
+        </div>
+        {% endfor %}
+        {% if not permanent_achievements %}
+          <div class="empty">Нет постоянных достижений.</div>
+        {% endif %}
       </div>
-      {% endfor %}
-      {% if not seasonal_achievements %}
-        <div class="empty">Нет сезонных достижений.</div>
-      {% endif %}
-    </div>
-  </div>
+
+      <div class="achievement-category" onclick="toggleSection('seasonal')">Сезонные</div>
+      <div id="seasonal" class="achievement-section">
+        {% for ach in seasonal_achievements %}
+        <div class="achievement reveal">
+          <div class="ach-title">{{ ach.name }}</div>
+          <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
+          <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
+        </div>
+        {% endfor %}
+        {% if not seasonal_achievements %}
+          <div class="empty">Нет сезонных достижений.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
 
   <script>
     function toggleSection(id) {
