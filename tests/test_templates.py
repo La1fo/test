@@ -49,11 +49,12 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("/api/support", faq)
 
     def test_jivo_script_present_on_key_pages_and_not_duplicated(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
+        snippet = '//code.jivo.ru/widget/FaDWcuzcG6'
         for file_name in pages:
             html = self._read(file_name)
-            self.assertIn('/static/jivo-widget.js', html)
-            self.assertEqual(html.count('/static/jivo-widget.js'), 1)
+            self.assertIn(snippet, html)
+            self.assertEqual(html.count(snippet), 1)
 
     def test_profile_ui_does_not_use_old_gp_labels(self):
         profile_template = self._read("profile.html")
