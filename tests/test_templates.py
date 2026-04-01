@@ -42,11 +42,16 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("/400", leaderboard)
         self.assertNotIn("400+/400", leaderboard)
 
-    def test_faq_no_stale_texts_and_no_support_block(self):
+    def test_no_stale_support_blocks_on_user_pages(self):
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
+        forbidden_tokens = ["chat-widget", "/api/support", "support-form", "support-block"]
+        for file_name in pages:
+            html = self._read(file_name)
+            for token in forbidden_tokens:
+                self.assertNotIn(token, html)
+
         faq = self._read("faq.html")
         self.assertNotIn("Находиться в разработке", faq)
-        self.assertNotIn("chat-widget", faq)
-        self.assertNotIn("/api/support", faq)
 
     def test_jivo_script_present_on_key_pages_and_not_duplicated(self):
         pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
@@ -62,6 +67,14 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("Общий GP", profile_template)
         self.assertNotIn("GP в ранге", profile_template)
         self.assertNotIn("GP в текущем ранге", profile_template)
+
+    def test_key_pages_have_basic_html_shell(self):
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
+        for file_name in pages:
+            html = self._read(file_name)
+            self.assertIn("<body", html)
+            self.assertIn("</body>", html)
+            self.assertIn("</html>", html)
 
 
 if __name__ == "__main__":
