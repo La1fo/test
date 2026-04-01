@@ -1,37 +1,56 @@
-# backend/init_db.py
-import os
-import sys
-sys.path.insert(0, os.path.dirname(__file__))
+"""Проверка готовности read-only DB contract для сайта FriendlyMap."""
 
-from database import bot_engine
-from models.database_models import Base, Achievement
-from sqlalchemy.orm import sessionmaker
+from urllib.parse import urlsplit
 
-# Создаём таблицы
-print("Создаём таблицы...")
-Base.metadata.create_all(bind=bot_engine)
-print("✅ Таблицы созданы")
 
-# Заполняем таблицу достижений (пример)
-Session = sessionmaker(bind=bot_engine)
-db = Session()
+def _safe_db_url(db_url: str) -> str:
+    parts = urlsplit(db_url)
+    if not parts.password:
+        return db_url
 
-# Проверяем, не заполнена ли уже
-if db.query(Achievement).count() == 0:
-    print("Заполняем таблицу достижений...")
-    achievements = [
-        Achievement(id="facade_expert", name="Эксперт по фасадам", reward_points=150),
-        Achievement(id="night_watch", name="Ночной дозор", reward_points=120),
-        Achievement(id="detail_master", name="Мастер деталей", reward_points=100),
-        Achievement(id="architect_critic", name="Архитектурный критик", reward_points=250),
-        Achievement(id="first_friend", name="Первый друг", reward_points=100),
-        Achievement(id="teamwork", name="Командная работа", reward_points=150),
-        Achievement(id="trendsetter", name="Трендсеттер", reward_points=250),
-    ]
-    db.add_all(achievements)
-    db.commit()
-    print("✅ Достижения добавлены")
-else:
-    print("ℹ️ Достижения уже есть в БД")
+    host = parts.hostname or "localhost"
+    port = f":{parts.port}" if parts.port else ""
+    user = parts.username or "user"
+    return f"{parts.scheme}://{user}:***@{host}{port}{parts.path}"
 
-db.close()
+
+def main() -> int:
+    try:
+        from .database import BOT_DB_URL, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
+    except ModuleNotFoundError as exc:
+        print("❌ Не хватает Python-зависимостей для запуска init_db.")
+        print(f"Причина: {exc}")
+        print("Установите зависимости текущим интерпретатором:")
+        print("python3 -m pip install -r requirements.txt")
+        return 1
+
+    contract = get_db_contract()
+    print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
+    print(f"Режим БД: {'read-only' if DB_READ_ONLY else 'read-write'}")
+    print(f"Schema mode: {'legacy-compat' if LEGACY_SCHEMA_COMPAT else 'strict-contract'}")
+    print(f"Legacy compatibility: {'on' if LEGACY_SCHEMA_COMPAT else 'off'}")
+    print("Ожидаемые VIEW контракта:")
+    print(f"- leaderboard: {contract.leaderboard_view}")
+    print(f"- public_users: {contract.public_users_view}")
+    print(f"- public_locations: {contract.public_locations_view}")
+    print(f"- achievements: {contract.achievements_view}")
+    print(f"- auth_users: {contract.auth_users_view}")
+
+    try:
+        ok, errors = validate_db_contract()
+        if ok:
+            print("✅ DB contract валиден")
+            return 0
+
+        print("❌ DB contract невалиден:")
+        for err in errors:
+            print(f"  - {err}")
+        return 1
+    except Exception as exc:
+        print("❌ Не удалось проверить DB contract.")
+        print(exc)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
