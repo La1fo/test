@@ -118,6 +118,30 @@
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
     }
+
+    .email-pill {
+      margin-top: 18px;
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 16px;
+      background: rgba(255,255,255,.94);
+      border: 1px solid #d7e7ff;
+      border-radius: 999px;
+      color: #32506a;
+      font-weight: 600;
+      box-shadow: 0 2px 10px rgba(0,0,0,.06);
+      animation: fadeUp .55s ease both;
+    }
+
+    .email-pill a {
+      color: #0b67b2;
+      text-decoration: none;
+    }
+
+    .email-pill a:hover {
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -137,11 +161,14 @@
     <button id="botLink" class="btn-telegram">Начать в Telegram</button>
   </div>
 
+  <div class="email-pill">Почта: <a href="mailto:friendlymapbot@gmail.com">friendlymapbot@gmail.com</a></div>
+
   <script>
     document.getElementById("botLink").addEventListener("click", (e) => {
       e.preventDefault();
       window.open("https://t.me/Friendly_MapBot", '_blank');
     });
   </script>
+  <script src="/static/jivo-widget.js" defer></script>
 </body>
 </html>

@@ -6,37 +6,6 @@
   <title>Помощь — Frendly Map</title>
   <link rel="stylesheet" href="/static/page-theme.css" />
   <style>
-    .faq-category {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 18px;
-      background: #e3f2fd;
-      color: #0077cc;
-      font-size: 1.1rem;
-      font-weight: 600;
-      border-radius: 12px;
-      cursor: pointer;
-      margin-top: 22px;
-      transition: background .2s ease, transform .2s ease;
-    }
-
-    .faq-category:hover {
-      background: #d4e9ff;
-      transform: translateY(-1px);
-    }
-
-    .faq-category::after {
-      content: "⮟";
-      font-size: 1.3em;
-      font-weight: bold;
-      width: 26px;
-      text-align: center;
-    }
-
-    .faq-category.active::after { content: "⮝"; }
-    .faq-section { display: none; margin-top: 12px; }
-    .faq-section.active { display: block; }
 
     .faq-item {
       margin-bottom: 12px;
@@ -87,8 +56,9 @@
     <section class="surface-card">
       <h1 class="page-title">FAQ / Помощь</h1>
 
-      <div class="faq-category active" onclick="toggleSection('locations')">Локации и карта</div>
-      <div id="locations" class="faq-section active">
+      <div class="interactive-toggle active" onclick="toggleSection('locations')">Локации и карта</div>
+      <div id="locations" class="expand-section active">
+        <div class="expand-content">
         <div class="faq-item reveal">
           <div class="faq-question">Как сейчас добавить локацию?</div>
           <div class="faq-answer">Через Telegram-бота: выберите добавление локации, укажите название и описание, поставьте точку на карте и отправьте фото места.</div>
@@ -98,9 +68,11 @@
           <div class="faq-answer">После модерации. Проверка нужна для качества данных и корректной геопозиции, поэтому публикация может занять время.</div>
         </div>
       </div>
+      </div>
 
-      <div class="faq-category" onclick="toggleSection('ranks')">Ранги и GP</div>
-      <div id="ranks" class="faq-section">
+      <div class="interactive-toggle" onclick="toggleSection('ranks')">Ранги и GP</div>
+      <div id="ranks" class="expand-section">
+        <div class="expand-content">
         <div class="faq-item reveal">
           <div class="faq-question">Как работает система рангов?</div>
           <div class="faq-answer">Ранг зависит от общего GP. Сайт отображает тот же ранг, что writer-side сервисы FriendlyMap.</div>
@@ -118,9 +90,11 @@
           </div>
         </div>
       </div>
+      </div>
 
-      <div class="faq-category" onclick="toggleSection('achievements')">Достижения</div>
-      <div id="achievements" class="faq-section">
+      <div class="interactive-toggle" onclick="toggleSection('achievements')">Достижения</div>
+      <div id="achievements" class="expand-section">
+        <div class="expand-content">
         <div class="faq-item reveal">
           <div class="faq-question">Что показывается на странице достижений?</div>
           <div class="faq-answer">Постоянные и сезонные достижения, описание и информация о награде или количестве пользователей, которые уже выполнили достижение.</div>
@@ -130,16 +104,18 @@
           <div class="faq-answer">Источник — общая read-only VIEW. Если доступны дополнительные reward-поля, сайт показывает их; иначе используется базовый GP/статистический формат.</div>
         </div>
       </div>
+      </div>
     </section>
   </main>
 
   <script>
     function toggleSection(id) {
       const section = document.getElementById(id);
-      const category = document.querySelector(`.faq-category[onclick="toggleSection('${id}')"]`);
+      const category = document.querySelector(`.interactive-toggle[onclick="toggleSection('${id}')"]`);
       section.classList.toggle('active');
       category.classList.toggle('active');
     }
   </script>
+  <script src="/static/jivo-widget.js" defer></script>
 </body>
 </html>

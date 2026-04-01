@@ -120,3 +120,54 @@ body.site-theme {
     padding: 24px 16px;
   }
 }
+
+
+.interactive-toggle {
+  background: #f5f9ff;
+  border: 2px solid #d7e7ff;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-top: 12px;
+  font-weight: 700;
+  color: #0b67b2;
+  cursor: pointer;
+  position: relative;
+  transition: all .2s ease;
+}
+
+.interactive-toggle:hover {
+  background: #eaf3ff;
+  transform: translateY(-1px);
+}
+
+.interactive-toggle::after {
+  content: '+';
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 20px;
+  font-weight: 700;
+  transition: transform .25s ease;
+}
+
+.interactive-toggle.active::after {
+  content: '−';
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.expand-section {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows .28s ease;
+  margin-top: 10px;
+  margin-bottom: 16px;
+}
+
+.expand-section > .expand-content {
+  overflow: hidden;
+}
+
+.expand-section.active {
+  grid-template-rows: 1fr;
+}

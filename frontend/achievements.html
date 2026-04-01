@@ -6,50 +6,6 @@
   <title>Достижения — Frendly Map</title>
   <link rel="stylesheet" href="/static/page-theme.css" />
   <style>
-    .achievement-category {
-      background: #f5f9ff;
-      border: 2px solid #d7e7ff;
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin-top: 12px;
-      font-weight: 700;
-      color: #0b67b2;
-      cursor: pointer;
-      position: relative;
-      transition: all .2s ease;
-    }
-
-    .achievement-category:hover {
-      background: #eaf3ff;
-      transform: translateY(-1px);
-    }
-
-    .achievement-category::after {
-      content: '+';
-      position: absolute;
-      right: 16px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 20px;
-      font-weight: 700;
-      transition: transform .25s ease;
-    }
-
-    .achievement-category.active::after {
-      content: '−';
-      transform: translateY(-50%) rotate(180deg);
-    }
-
-    .achievement-section {
-      display: grid;
-      grid-template-rows: 0fr;
-      transition: grid-template-rows .28s ease;
-      margin-top: 10px;
-      margin-bottom: 16px;
-    }
-
-    .achievement-section > .achievement-list { overflow: hidden; }
-    .achievement-section.active { grid-template-rows: 1fr; }
 
     .achievement {
       background: #fff;
@@ -88,9 +44,9 @@
         <div class="warning">{{ db_warning }}</div>
       {% endif %}
 
-      <div class="achievement-category active" onclick="toggleSection('permanent')">Постоянные</div>
-      <div id="permanent" class="achievement-section active">
-        <div class="achievement-list">
+      <div class="interactive-toggle active" onclick="toggleSection('permanent')">Постоянные</div>
+      <div id="permanent" class="expand-section active">
+        <div class="expand-content achievement-list">
           {% for ach in permanent_achievements %}
           <div class="achievement reveal">
             <div class="ach-title">{{ ach.name }}</div>
@@ -114,9 +70,9 @@
         </div>
       </div>
 
-      <div class="achievement-category" onclick="toggleSection('seasonal')">Сезонные</div>
-      <div id="seasonal" class="achievement-section">
-        <div class="achievement-list">
+      <div class="interactive-toggle" onclick="toggleSection('seasonal')">Сезонные</div>
+      <div id="seasonal" class="expand-section">
+        <div class="expand-content achievement-list">
           {% for ach in seasonal_achievements %}
           <div class="achievement reveal">
             <div class="ach-title">{{ ach.name }}</div>
@@ -145,10 +101,11 @@
   <script>
     function toggleSection(id) {
       const section = document.getElementById(id);
-      const category = document.querySelector(`.achievement-category[onclick="toggleSection('${id}')"]`);
+      const category = document.querySelector(`.interactive-toggle[onclick="toggleSection('${id}')"]`);
       section.classList.toggle('active');
       category.classList.toggle('active');
     }
   </script>
+  <script src="/static/jivo-widget.js" defer></script>
 </body>
 </html>
