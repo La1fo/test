@@ -6,6 +6,13 @@ class TestTemplates(unittest.TestCase):
     def _read(self, name: str) -> str:
         return Path(f"/workspace/test/frontend/{name}").read_text()
 
+    def _assert_jivo_widget(self, file_name: str):
+        html = self._read(file_name)
+        script_tag = '<script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>'
+        self.assertIn(script_tag, html)
+        self.assertEqual(html.count(script_tag), 1)
+        self.assertIn(f"{script_tag}\n</body>", html)
+
     def test_pages_use_shared_theme_stylesheet(self):
         for page in (self._read("achievements.html"), self._read("leaderboard.html"), self._read("faq.html")):
             self.assertIn("/static/page-theme.css", page)
@@ -53,13 +60,23 @@ class TestTemplates(unittest.TestCase):
         faq = self._read("faq.html")
         self.assertNotIn("Находиться в разработке", faq)
 
-    def test_jivo_script_present_on_key_pages_and_not_duplicated(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
-        snippet = '//code.jivo.ru/widget/FaDWcuzcG6'
-        for file_name in pages:
-            html = self._read(file_name)
-            self.assertIn(snippet, html)
-            self.assertEqual(html.count(snippet), 1)
+    def test_jivo_script_present_on_home_page(self):
+        self._assert_jivo_widget("index.html")
+
+    def test_jivo_script_present_on_achievements_page(self):
+        self._assert_jivo_widget("achievements.html")
+
+    def test_jivo_script_present_on_leaderboard_page(self):
+        self._assert_jivo_widget("leaderboard.html")
+
+    def test_jivo_script_present_on_faq_page(self):
+        self._assert_jivo_widget("faq.html")
+
+    def test_jivo_script_present_on_profile_page(self):
+        self._assert_jivo_widget("profile.html")
+
+    def test_jivo_script_present_on_login_page(self):
+        self._assert_jivo_widget("login.html")
 
     def test_profile_ui_does_not_use_old_gp_labels(self):
         profile_template = self._read("profile.html")
