@@ -88,9 +88,9 @@ def _display_rank_name(rank_name: str | None, total_gp: int, position: int | Non
 
 
 def _format_gp_display(total_gp: int, gp_in_rank: int, rank_name: str) -> str:
-    _ = gp_in_rank
+    _ = total_gp
     _ = rank_name
-    return str(max(0, total_gp))
+    return str(max(0, gp_in_rank))
 
 
 def _contract_healthcheck() -> str | None:

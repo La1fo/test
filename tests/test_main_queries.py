@@ -81,7 +81,7 @@ class TestMainQueries(unittest.TestCase):
             self.assertEqual(result[0].rank_level, 2)
             self.assertEqual(result[0].gp_in_rank, 2)
             self.assertEqual(result[0].rank_name, "🟢 Исследователь 2")
-            self.assertEqual(result[0].gp_display, "102")
+            self.assertEqual(result[0].gp_display, "2")
         finally:
             restore()
 
@@ -94,7 +94,7 @@ class TestMainQueries(unittest.TestCase):
             result, warning = main._load_leaderboard()
             self.assertIsNone(warning)
             self.assertEqual(result[0].rank_name, "⭐ Мастер-картограф")
-            self.assertEqual(result[0].gp_display, "1450")
+            self.assertEqual(result[0].gp_display, "400")
         finally:
             restore()
 
@@ -106,7 +106,7 @@ class TestMainQueries(unittest.TestCase):
             profile, warning = main._load_profile(11)
             self.assertIsNone(warning)
             self.assertEqual(profile.rank_name, "⭐ Мастер-картограф")
-            self.assertEqual(profile.gp_display, "1300")
+            self.assertEqual(profile.gp_display, "400")
         finally:
             restore()
 
@@ -136,7 +136,19 @@ class TestMainQueries(unittest.TestCase):
             self.assertEqual(profile.gp_in_rank, 2)
             self.assertEqual(profile.rank_name, "🟢 Исследователь 2")
             self.assertEqual(profile.total_gp, 102)
-            self.assertEqual(profile.gp_display, "102")
+            self.assertEqual(profile.gp_display, "2")
+        finally:
+            restore()
+
+    def test_profile_rank_for_199_gp(self):
+        rows = [(12, "switch", 199, 2, 99, "Ранг 2", 4)]
+        cursor = FakeCursor(rows)
+        restore = self._patch_connection(cursor)
+        try:
+            profile, warning = main._load_profile(12)
+            self.assertIsNone(warning)
+            self.assertEqual(profile.rank_name, "🟢 Исследователь 2")
+            self.assertEqual(profile.gp_display, "99")
         finally:
             restore()
 
@@ -148,7 +160,7 @@ class TestMainQueries(unittest.TestCase):
             profile, warning = main._load_profile(9)
             self.assertIsNone(warning)
             self.assertEqual(profile.rank_name, "🟣 Картограф")
-            self.assertEqual(profile.gp_display, "950")
+            self.assertEqual(profile.gp_display, "50")
         finally:
             restore()
 
@@ -156,8 +168,10 @@ class TestMainQueries(unittest.TestCase):
         self.assertEqual(main._writer_rank_name(1300, 5), "⭐ Мастер-картограф")
         self.assertEqual(main._writer_rank_name(1300, 11), "🟣 Картограф")
         self.assertEqual(main._writer_rank_name(1500, None), "🟣 Картограф")
-        self.assertEqual(main._format_gp_display(1300, 0, "⭐ Мастер-картограф"), "1300")
-        self.assertEqual(main._format_gp_display(1500, 0, "⭐ Мастер-картограф"), "1500")
+        self.assertEqual(main._format_gp_display(1300, 400, "⭐ Мастер-картограф"), "400")
+        self.assertEqual(main._format_gp_display(1500, 600, "⭐ Мастер-картограф"), "600")
+        self.assertEqual(main._format_gp_display(102, 2, "🟢 Исследователь 2"), "2")
+        self.assertEqual(main._format_gp_display(199, 99, "🟢 Исследователь 2"), "99")
 
     def test_achievements_uses_contract_view(self):
         rows = [
