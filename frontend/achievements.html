@@ -6,12 +6,6 @@
   <title>Достижения — Frendly Map</title>
   <link rel="stylesheet" href="/static/page-theme.css" />
   <style>
-    .intro-text {
-      text-align: center;
-      color: #5f7284;
-      margin-bottom: 24px;
-    }
-
     .achievement-category {
       background: #f5f9ff;
       border: 2px solid #d7e7ff;
@@ -38,21 +32,24 @@
       transform: translateY(-50%);
       font-size: 20px;
       font-weight: 700;
+      transition: transform .25s ease;
     }
 
     .achievement-category.active::after {
       content: '−';
+      transform: translateY(-50%) rotate(180deg);
     }
 
     .achievement-section {
-      display: none;
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows .28s ease;
       margin-top: 10px;
       margin-bottom: 16px;
     }
 
-    .achievement-section.active {
-      display: block;
-    }
+    .achievement-section > .achievement-list { overflow: hidden; }
+    .achievement-section.active { grid-template-rows: 1fr; }
 
     .achievement {
       background: #fff;
@@ -81,13 +78,11 @@
     <a href="/achievements" class="active">Достижения</a>
     <a href="/leaderboard">Топ</a>
     <a href="/faq">Помощь</a>
-    <a href="/login">Вход</a>
   </nav>
 
   <main class="page-shell">
     <section class="surface-card">
       <h1 class="page-title">Достижения</h1>
-      <p class="intro-text">Собирайте баллы, получайте награды и становитесь легендой города.</p>
 
       {% if db_warning %}
         <div class="warning">{{ db_warning }}</div>
@@ -95,30 +90,54 @@
 
       <div class="achievement-category active" onclick="toggleSection('permanent')">Постоянные</div>
       <div id="permanent" class="achievement-section active">
-        {% for ach in permanent_achievements %}
-        <div class="achievement reveal">
-          <div class="ach-title">{{ ach.name }}</div>
-          <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
-          <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
+        <div class="achievement-list">
+          {% for ach in permanent_achievements %}
+          <div class="achievement reveal">
+            <div class="ach-title">{{ ach.name }}</div>
+            <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
+            <div class="ach-reward">
+              {% if ach.reward_points is defined and ach.reward_points is not none %}
+                Награда: +{{ ach.reward_points }} GP
+              {% elif ach.reward_amount is defined and ach.reward_type is defined %}
+                Награда: {{ ach.reward_type }} × {{ ach.reward_amount }}
+              {% elif ach.reward is defined and ach.reward %}
+                Награда: {{ ach.reward }}
+              {% else %}
+                Получили достижение: {{ ach.completed_count }} пользователей
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% if not permanent_achievements %}
+            <div class="empty">Нет постоянных достижений.</div>
+          {% endif %}
         </div>
-        {% endfor %}
-        {% if not permanent_achievements %}
-          <div class="empty">Нет постоянных достижений.</div>
-        {% endif %}
       </div>
 
       <div class="achievement-category" onclick="toggleSection('seasonal')">Сезонные</div>
       <div id="seasonal" class="achievement-section">
-        {% for ach in seasonal_achievements %}
-        <div class="achievement reveal">
-          <div class="ach-title">{{ ach.name }}</div>
-          <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
-          <div class="ach-reward">Награда: {{ ach.reward_points }} GP</div>
+        <div class="achievement-list">
+          {% for ach in seasonal_achievements %}
+          <div class="achievement reveal">
+            <div class="ach-title">{{ ach.name }}</div>
+            <div class="ach-desc">{{ ach.description or "Без описания" }}</div>
+            <div class="ach-reward">
+              {% if ach.reward_points is defined and ach.reward_points is not none %}
+                Награда: +{{ ach.reward_points }} GP
+              {% elif ach.reward_amount is defined and ach.reward_type is defined %}
+                Награда: {{ ach.reward_type }} × {{ ach.reward_amount }}
+              {% elif ach.reward is defined and ach.reward %}
+                Награда: {{ ach.reward }}
+              {% else %}
+                Получили достижение: {{ ach.completed_count }} пользователей
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+          {% if not seasonal_achievements %}
+            <div class="empty">Нет сезонных достижений.</div>
+          {% endif %}
         </div>
-        {% endfor %}
-        {% if not seasonal_achievements %}
-          <div class="empty">Нет сезонных достижений.</div>
-        {% endif %}
       </div>
     </section>
   </main>

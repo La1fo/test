@@ -88,11 +88,9 @@ def _display_rank_name(rank_name: str | None, total_gp: int, position: int | Non
 
 
 def _format_gp_display(total_gp: int, gp_in_rank: int, rank_name: str) -> str:
-    if rank_name == MASTER_CARTOGRAPHER_RANK_NAME:
-        return "400+/400" if total_gp > 1300 else "400/400"
-    if rank_name == CARTOGRAPHER_RANK_NAME:
-        return f"{max(0, min(total_gp - 900, 400))}/400"
-    return f"{max(0, min(gp_in_rank, 100))}/100"
+    _ = gp_in_rank
+    _ = rank_name
+    return str(max(0, total_gp))
 
 
 def _contract_healthcheck() -> str | None:
