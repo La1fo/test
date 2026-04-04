@@ -28,7 +28,7 @@ class TestTemplates(unittest.TestCase):
         self.assertIn("Добавляй метки и повышайте ранг", home)
 
     def test_nav_no_login_link(self):
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]:
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html"]:
             self.assertNotIn('href="/login"', self._read(file_name))
 
     def test_achievements_page_no_old_slogan(self):
@@ -50,7 +50,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("400+/400", leaderboard)
 
     def test_no_stale_support_blocks_on_user_pages(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html"]
         forbidden_tokens = ["chat-widget", "/api/support", "support-form", "support-block"]
         for file_name in pages:
             html = self._read(file_name)
@@ -78,6 +78,9 @@ class TestTemplates(unittest.TestCase):
     def test_jivo_script_present_on_login_page(self):
         self._assert_jivo_widget("login.html")
 
+    def test_jivo_script_present_on_add_location_page(self):
+        self._assert_jivo_widget("add-location.html")
+
     def test_profile_ui_does_not_use_old_gp_labels(self):
         profile_template = self._read("profile.html")
         self.assertIn("GP:", profile_template)
@@ -86,12 +89,17 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("GP в текущем ранге", profile_template)
 
     def test_key_pages_have_basic_html_shell(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html"]
         for file_name in pages:
             html = self._read(file_name)
             self.assertIn("<body", html)
             self.assertIn("</body>", html)
             self.assertIn("</html>", html)
+
+    def test_add_location_template_has_wizard_sections(self):
+        page = self._read("add-location.html")
+        for token in ["1. Название", "2. Описание", "3. Координаты", "4. Теги", "5. Фото", "6. Preview"]:
+            self.assertIn(token, page)
 
 
 if __name__ == "__main__":

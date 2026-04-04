@@ -105,6 +105,7 @@
 - `/auth/telegram` → `site_auth_users`
 - `/auth/email/login` → `site_auth_users`
 - `/auth/email/register` → отключён на reader-side (`403`)
+- `/add-location` → integration-shell UI (без записи в shared БД)
 
 ## Startup diagnostics
 - `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
@@ -126,3 +127,30 @@
 4. Проверить auth reader-flow:
    - `/auth/telegram` и `/auth/email/login` читают только `site_auth_users`
    - `/auth/email/register` возвращает `403`
+
+## Add-location integration shell (подготовка к writer-side)
+В этом репозитории добавлен **подготовительный слой** для будущего writer-side add-location flow:
+
+- UI-страница: `/add-location`
+- API preview/config stubs:
+  - `GET /api/add-location/form-config`
+  - `POST /api/add-location/preview`
+  - `POST /api/add-location/submit` → сейчас всегда `501` (writer интеграция ещё не подключена)
+
+### Что уже реализовано
+- Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
+- Client-side валидация обязательных полей.
+- Server-side DTO и валидация payload (теги ≤ 5, фото обязательно, координаты в диапазоне).
+- Явный API-контракт будущей интеграции.
+
+### Что ещё не реализовано в этом repo (и не должно быть fake-реализовано)
+- Канонический writer-side submit в shared БД.
+- Безопасная Telegram WebApp write-auth цепочка для записи.
+- Media storage backend для реальных web-upload файлов.
+- Транзакционная доменная write-логика add-location.
+
+### Ожидаемый контракт будущей writer интеграции
+- `submit` должен принимать `AddLocationSubmitRequest` (включая `idempotency_key`) и возвращать
+  успешный ответ с идентификатором pending-локации.
+- Ошибки валидации/авторизации/идемпотентности должны возвращаться как структурированные API-ошибки.
+- Текущий integration-shell UI не должен меняться, подключается только реальный writer backend.

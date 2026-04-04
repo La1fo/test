@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from .api import add_location
 from .database import get_connection, get_db_contract, validate_db_contract
 
 load_dotenv()
@@ -19,6 +20,7 @@ frontend_path = os.path.join(project_root, "frontend")
 
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
 templates = Jinja2Templates(directory=frontend_path)
+app.include_router(add_location.router, prefix="/api/add-location", tags=["add-location"])
 
 WRITER_RANK_NAMES = (
     "🟢 Исследователь 1",
@@ -274,6 +276,11 @@ async def leaderboard_page(request: Request):
 @app.get("/faq", response_class=HTMLResponse)
 async def faq_page(request: Request):
     return templates.TemplateResponse("faq.html", get_context(request))
+
+
+@app.get("/add-location", response_class=HTMLResponse)
+async def add_location_page(request: Request):
+    return templates.TemplateResponse("add-location.html", get_context(request))
 
 
 @app.get("/profile/{user_id}", response_class=HTMLResponse)
