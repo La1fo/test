@@ -1,14 +1,14 @@
 import asyncio
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
-from fastapi import HTTPException
 from pydantic import ValidationError
 
 from backend import main
 from backend import add_location_contract as contract
 from backend.api import add_location
-from backend.schemas import AddLocationPreviewRequest, AddLocationSubmitRequest
+from backend.schemas import AddLocationPreviewRequest, AddLocationSubmitRequest, PhotoMeta, PhotoUploadRequest
 
 
 class TestAddLocationIntegrationShell(unittest.TestCase):
@@ -33,6 +33,7 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         self.assertIn("/add-location", paths)
         self.assertIn("/api/add-location/form-config", paths)
         self.assertIn("/api/add-location/preview", paths)
+        self.assertIn("/api/add-location/upload", paths)
         self.assertIn("/api/add-location/submit", paths)
 
     def test_add_location_page_renders_template(self):
@@ -72,12 +73,29 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         with self.assertRaises(ValidationError):
             AddLocationPreviewRequest(**payload)
 
-    def test_submit_stub_honest_response(self):
+    def test_submit_success_response_shape(self):
         payload = AddLocationSubmitRequest(**{**self._valid_payload(), "idempotency_key": "test-key-12345"})
-        with self.assertRaises(HTTPException) as exc:
-            add_location.submit_stub(payload)
-        self.assertEqual(exc.exception.status_code, 501)
-        self.assertIn("Writer-side integration not connected", exc.exception.detail)
+        old_submit = add_location.submit_location
+        add_location.submit_location = lambda payload, init_data: SimpleNamespace(location_id=77, status="pending", duplicate=False)
+        try:
+            response = add_location.submit(payload, x_telegram_init_data="signed-init-data")
+            self.assertTrue(response.accepted)
+            self.assertEqual(response.location_id, 77)
+            self.assertEqual(response.status, "pending")
+            self.assertFalse(response.duplicate)
+        finally:
+            add_location.submit_location = old_submit
+
+    def test_upload_endpoint_uses_service_layer(self):
+        old_upload = add_location.save_temp_uploads
+        add_location.save_temp_uploads = lambda files: [PhotoMeta(temp_id="tmp-1", filename="a.jpg", mime_type="image/jpeg", size_bytes=1)]
+        try:
+            payload = PhotoUploadRequest(files=[{"filename": "a.jpg", "mime_type": "image/jpeg", "content_base64": "YQ=="}])
+            response = add_location.upload_photos(payload)
+            self.assertEqual(len(response), 1)
+            self.assertEqual(response[0].temp_id, "tmp-1")
+        finally:
+            add_location.save_temp_uploads = old_upload
 
     def test_existing_reader_routes_still_registered(self):
         paths = {route.path for route in main.app.routes}

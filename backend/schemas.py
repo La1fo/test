@@ -60,6 +60,16 @@ class PhotoMeta(BaseModel):
     size_bytes: int = Field(gt=0, le=contract.MAX_PHOTO_SIZE_BYTES)
 
 
+class PhotoUploadItem(BaseModel):
+    filename: str = Field(min_length=1, max_length=255)
+    mime_type: str = Field(min_length=1, max_length=100)
+    content_base64: str = Field(min_length=1)
+
+
+class PhotoUploadRequest(BaseModel):
+    files: list[PhotoUploadItem] = Field(min_length=1, max_length=contract.MAX_PHOTOS)
+
+
 class AddLocationBasePayload(BaseModel):
     name: str = Field(min_length=3, max_length=120)
     description: str = Field(min_length=10, max_length=3000)
@@ -111,6 +121,9 @@ class AddLocationPreviewResponse(BaseModel):
 
 class AddLocationSubmitResponse(BaseModel):
     accepted: bool
+    location_id: int
+    status: str
+    duplicate: bool = False
     message: str
 
 

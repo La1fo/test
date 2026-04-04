@@ -2,6 +2,7 @@
   const state = {
     tags: new Set(),
     tagCatalog: [],
+    uploadedPhotos: [],
     maxTags: 5,
     maxPhotoSizeBytes: 10 * 1024 * 1024,
     submitMessage: '',
@@ -16,6 +17,10 @@
   function setStatus(text, isError = false) {
     statusBox.textContent = text;
     statusBox.classList.toggle('error', isError);
+  }
+
+  function getInitData() {
+    return window.Telegram?.WebApp?.initData || '';
   }
 
   async function loadConfig() {
@@ -57,14 +62,57 @@
     renderTags();
   }
 
-  function buildPhotoMeta() {
+  function renderUploadedPhotos() {
+    photoPreview.innerHTML = '';
+    state.uploadedPhotos.forEach((photo) => {
+      const el = document.createElement('div');
+      el.className = 'photo-pill';
+      el.textContent = `${photo.filename} (${Math.round(photo.size_bytes / 1024)} KB)`;
+      photoPreview.appendChild(el);
+    });
+  }
+
+  async function uploadSelectedPhotos() {
     const files = Array.from(photoInput.files || []);
-    return files.map((file, idx) => ({
-      temp_id: `local-${Date.now()}-${idx}`,
-      filename: file.name,
-      mime_type: file.type || 'application/octet-stream',
-      size_bytes: file.size,
-    }));
+    if (!files.length) {
+      state.uploadedPhotos = [];
+      renderUploadedPhotos();
+      return;
+    }
+
+    const toBase64 = (file) => new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const value = String(reader.result || '');
+        resolve(value.split(',')[1] || '');
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const encodedFiles = await Promise.all(
+      files.map(async (file) => ({
+        filename: file.name,
+        mime_type: file.type || 'application/octet-stream',
+        content_base64: await toBase64(file),
+      })),
+    );
+
+    const res = await fetch('/api/add-location/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: encodedFiles }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+      setStatus(data?.detail || 'Ошибка загрузки фото', true);
+      return;
+    }
+
+    state.uploadedPhotos = data;
+    renderUploadedPhotos();
+    setStatus('Фото загружены и готовы к отправке.');
   }
 
   function buildPayload() {
@@ -76,7 +124,7 @@
         longitude: Number(document.getElementById('longitude').value),
       },
       tag_ids: Array.from(state.tags),
-      photos: buildPhotoMeta(),
+      photos: state.uploadedPhotos,
     };
   }
 
@@ -84,8 +132,7 @@
     if (!payload.name?.trim()) return 'Введите название';
     if (!payload.description?.trim()) return 'Введите описание';
     if (payload.tag_ids.length > state.maxTags) return `Можно выбрать максимум ${state.maxTags} тегов`;
-    if (!payload.photos.length) return 'Добавьте хотя бы одно фото';
-    if (payload.photos.some((p) => p.size_bytes > state.maxPhotoSizeBytes)) return 'Фото превышает допустимый размер';
+    if (!payload.photos.length) return 'Загрузите хотя бы одно фото';
     if (payload.coordinates.latitude < -90 || payload.coordinates.latitude > 90) return 'Некорректная широта';
     if (payload.coordinates.longitude < -180 || payload.coordinates.longitude > 180) return 'Некорректная долгота';
     return null;
@@ -104,7 +151,7 @@
       <div style="margin-top:6px;"><strong>Теги:</strong> ${tags}</div>
       <div style="margin-top:6px;"><strong>Фото:</strong></div>
       <ul style="margin:6px 0 0 18px;">${photos}</ul>
-      <div style="margin-top:8px;"><strong>Статус интеграции:</strong> ${state.submitMessage}</div>
+      <div style="margin-top:8px;"><strong>Статус:</strong> ${state.submitMessage}</div>
     `;
   }
 
@@ -147,26 +194,24 @@
 
     const res = await fetch('/api/add-location/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Telegram-Init-Data': getInitData(),
+      },
       body: JSON.stringify(submitPayload),
     });
     const data = await res.json();
-    setStatus(data?.detail || 'Writer-side интеграция пока не подключена', true);
-  }
 
-  function onPhotosChanged() {
-    const files = Array.from(photoInput.files || []);
-    photoPreview.innerHTML = '';
-    files.forEach((file) => {
-      const el = document.createElement('div');
-      el.className = 'photo-pill';
-      el.textContent = `${file.name} (${Math.round(file.size / 1024)} KB)`;
-      photoPreview.appendChild(el);
-    });
+    if (!res.ok) {
+      setStatus(data?.detail || 'Не удалось отправить локацию', true);
+      return;
+    }
+
+    setStatus(`Локация #${data.location_id} отправлена на модерацию.`);
   }
 
   document.getElementById('previewBtn').addEventListener('click', runPreview);
-  photoInput.addEventListener('change', onPhotosChanged);
+  photoInput.addEventListener('change', uploadSelectedPhotos);
   document.getElementById('addLocationForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     await submit();

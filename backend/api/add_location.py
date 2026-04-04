@@ -1,15 +1,19 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header
 
 from .. import add_location_contract as contract
+from ..add_location_service import save_temp_uploads, submit_location
 from ..schemas import (
     AddLocationFormConfigResponse,
     AddLocationPreviewRequest,
     AddLocationPreviewResponse,
     AddLocationSubmitRequest,
     AddLocationSubmitResponse,
+    PhotoUploadRequest,
+    PhotoMeta,
 )
 
 router = APIRouter()
+
 
 @router.get("/form-config", response_model=AddLocationFormConfigResponse)
 def get_add_location_form_config() -> AddLocationFormConfigResponse:
@@ -33,10 +37,21 @@ def build_preview(payload: AddLocationPreviewRequest) -> AddLocationPreviewRespo
     )
 
 
+@router.post("/upload", response_model=list[PhotoMeta])
+def upload_photos(payload: PhotoUploadRequest) -> list[PhotoMeta]:
+    return save_temp_uploads(payload.files)
+
+
 @router.post("/submit", response_model=AddLocationSubmitResponse)
-def submit_stub(payload: AddLocationSubmitRequest) -> AddLocationSubmitResponse:
-    _ = payload
-    raise HTTPException(
-        status_code=501,
-        detail=contract.SUBMIT_NOT_CONNECTED_DETAIL,
+def submit(
+    payload: AddLocationSubmitRequest,
+    x_telegram_init_data: str = Header(default="", alias="X-Telegram-Init-Data"),
+) -> AddLocationSubmitResponse:
+    result = submit_location(payload=payload, init_data=x_telegram_init_data)
+    return AddLocationSubmitResponse(
+        accepted=True,
+        location_id=result.location_id,
+        status=result.status,
+        duplicate=result.duplicate,
+        message="Локация отправлена на модерацию",
     )

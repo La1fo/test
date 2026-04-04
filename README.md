@@ -102,7 +102,7 @@
 - `/leaderboard` → `site_leaderboard`
 - `/profile/{user_id}` → `site_public_users`
 - `/achievements` → `site_achievements_overview`
-- `/add-location` → integration-shell UI (без записи в shared БД)
+- `/add-location` → web add-location flow
 
 ## Startup diagnostics
 - `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
@@ -121,38 +121,35 @@
    - `/leaderboard`
    - `/profile/{user_id}`
    - `/achievements`
-4. Проверить add-location integration-shell:
+4. Проверить add-location:
    - `/add-location` рендерится
-   - `/api/add-location/form-config` и `/api/add-location/preview` доступны
-   - `/api/add-location/submit` честно возвращает `501` до подключения writer backend
+   - `/api/add-location/form-config`, `/api/add-location/upload`, `/api/add-location/preview`, `/api/add-location/submit` доступны
+   - при `DB_READ_ONLY=1` submit блокируется с понятной ошибкой
 
-## Add-location integration shell (подготовка к writer-side)
-В этом репозитории добавлен **подготовительный слой** для будущего writer-side add-location flow:
+## Add-location flow
+В этом репозитории реализован полноценный web flow добавления локации:
 
 - UI-страница: `/add-location`
-- API preview/config stubs:
+- API:
   - `GET /api/add-location/form-config`
+  - `POST /api/add-location/upload`
   - `POST /api/add-location/preview`
-  - `POST /api/add-location/submit` → сейчас всегда `501` (writer интеграция ещё не подключена)
+  - `POST /api/add-location/submit`
 
-### Что уже реализовано
+### Что реализовано
 - Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
-- Client-side валидация обязательных полей.
-- Server-side DTO и валидация payload (теги ≤ 5, фото обязательно, координаты в диапазоне).
-- Явный API-контракт будущей интеграции.
+- Client-side + server-side валидация обязательных полей.
+- Реальная запись pending-локации в write-режиме (`DB_READ_ONLY=0`).
+- Атомарный submit path с idempotency key.
+- Upload и хранение web-фото в `MEDIA_ROOT` + обратная совместимость legacy `file_id`.
 
-### Что ещё не реализовано в этом repo (и не должно быть fake-реализовано)
-- Канонический writer-side submit в shared БД.
-- Безопасная Telegram WebApp write-auth цепочка для записи.
-- Media storage backend для реальных web-upload файлов.
-- Транзакционная доменная write-логика add-location.
+### Runtime требования для submit
+- `DB_READ_ONLY=0`
+- `TELEGRAM_BOT_TOKEN` задан (для проверки `X-Telegram-Init-Data`)
+- write-права к таблицам `users`, `locations`, `tags`, `location_tags`, `photos`
+- `MEDIA_ROOT` доступен на запись
 
-### Ожидаемый контракт будущей writer интеграции
-- `submit` должен принимать `AddLocationSubmitRequest` (включая `idempotency_key`) и возвращать
-  успешный ответ с идентификатором pending-локации.
-- Ошибки валидации/авторизации/идемпотентности должны возвращаться как структурированные API-ошибки.
-- Текущий integration-shell UI не должен меняться, подключается только реальный writer backend.
-
-## Auth note for this runtime
-- В текущем `backend/main.py` подключены HTML-роуты и `/api/add-location/*`.
-- Модуль `backend/api/auth.py` присутствует, но его роутер в `main.py` сейчас не смонтирован.
+### Media и миграции
+- На старте в write-режиме вызывается `ensure_add_location_schema()`:
+  - добавляются дополнительные колонки в `photos` (если отсутствуют),
+  - создаётся `site_submission_idempotency`.

@@ -3,7 +3,7 @@
 This module centralizes limits and catalog defaults so UI/API/tests stay in sync.
 """
 
-INTEGRATION_ENABLED = False
+INTEGRATION_ENABLED = True
 MAX_TAGS = 5
 MAX_PHOTOS = 8
 MAX_PHOTO_SIZE_MB = 10
@@ -21,12 +21,7 @@ TAG_CATALOG = [
 ]
 
 SUBMIT_DISABLED_MESSAGE = (
-    "Форма готова к интеграции с writer-side backend. "
-    "Финальная отправка в shared БД пока отключена на reader-side сайте."
+    "Проверьте данные и отправьте локацию на модерацию."
 )
 
-PREVIEW_WARNING = "Это preview в integration-shell режиме: запись в shared БД здесь не выполняется."
-SUBMIT_NOT_CONNECTED_DETAIL = (
-    "Writer-side integration not connected in this repository. "
-    "Use writer backend submission service when available."
-)
+PREVIEW_WARNING = "После отправки локация будет создана со статусом pending и уйдёт на модерацию."

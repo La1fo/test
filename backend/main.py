@@ -8,7 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .api import add_location
-from .database import get_connection, get_db_contract, validate_db_contract
+from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
+from .migrations import ensure_add_location_schema
 
 load_dotenv()
 
@@ -17,8 +18,11 @@ app = FastAPI(title="Frendly Map Website")
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 frontend_path = os.path.join(project_root, "frontend")
+media_path = os.getenv("MEDIA_ROOT", os.path.join(project_root, "media"))
 
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+os.makedirs(media_path, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_path), name="media")
 templates = Jinja2Templates(directory=frontend_path)
 app.include_router(add_location.router, prefix="/api/add-location", tags=["add-location"])
 
@@ -111,6 +115,8 @@ def startup_contract_check() -> None:
     error = _contract_healthcheck()
     if error:
         raise RuntimeError(error)
+    if not DB_READ_ONLY:
+        ensure_add_location_schema()
 
 
 def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
