@@ -106,6 +106,16 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         with self.assertRaises(HTTPException):
             add_location.submit(payload, request=SimpleNamespace(cookies={}), x_telegram_init_data="")
 
+    def test_preview_without_auth_is_forbidden(self):
+        payload = AddLocationPreviewRequest(**self._valid_payload())
+        with self.assertRaises(HTTPException):
+            add_location.build_preview(payload, request=SimpleNamespace(cookies={}))
+
+    def test_upload_without_auth_is_forbidden(self):
+        payload = PhotoUploadRequest(files=[{"filename": "a.jpg", "mime_type": "image/jpeg", "content_base64": "YQ=="}])
+        with self.assertRaises(HTTPException):
+            add_location.upload_photos(payload, request=SimpleNamespace(cookies={}))
+
     def test_upload_endpoint_uses_service_layer(self):
         old_upload = add_location.save_temp_uploads
         add_location.save_temp_uploads = lambda files: [PhotoMeta(temp_id="tmp-1", filename="a.jpg", mime_type="image/jpeg", size_bytes=1)]

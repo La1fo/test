@@ -32,10 +32,12 @@
 <body class="site-theme">
   <nav class="top-nav reveal">
     <a href="/">Главная</a>
+    <a href="/map">Карта</a>
     <a href="/add-location" class="active">Добавить</a>
     <a href="/achievements">Достижения</a>
     <a href="/leaderboard">Топ</a>
     <a href="/faq">Помощь</a>
+    {% if current_user_id %}<a href="/profile/me">Мой профиль</a><a href="/logout">Выйти</a>{% else %}<a href="/login?next=/add-location">Войти</a>{% endif %}
   </nav>
 
   <main class="page-shell">
@@ -56,6 +58,7 @@
 
         <div class="step">
           <h3>3. Координаты</h3>
+          <button id="myLocationBtn" type="button" class="btn btn-secondary">Определить мою геопозицию</button>
           <div id="pickerMap" style="height:320px;border-radius:10px;"></div>
           <div class="field"><input id="coordinatesLabel" readonly placeholder="Кликните на карту, чтобы выбрать точку" /></div>
           <input id="latitude" type="hidden" />

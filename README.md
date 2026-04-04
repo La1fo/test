@@ -123,12 +123,13 @@
    - `/leaderboard`
    - `/profile/{user_id}`
    - `/achievements`
-4. Проверить auth и add-location:
+4. Проверить auth, add-location и map:
    - `/login` поддерживает email и Telegram WebApp login
    - `/profile/me` требует сессию
    - `/add-location` рендерится
    - `/api/add-location/form-config`, `/api/add-location/upload`, `/api/add-location/preview`, `/api/add-location/submit` доступны
    - при `DB_READ_ONLY=1` submit блокируется с понятной ошибкой
+   - `/map` показывает точки, поиск и фильтры по тегам, кнопку геопозиции
 
 ## Add-location flow
 В этом репозитории реализован полноценный web flow добавления локации:
@@ -143,12 +144,14 @@
 ### Что реализовано
 - Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
 - Выбор координат через карту (Leaflet) с маркером.
+- На add-location и /map есть кнопка определения геопозиции пользователя.
 - Client-side + server-side валидация обязательных полей.
 - Реальная запись pending-локации в write-режиме (`DB_READ_ONLY=0`).
 - Атомарный submit path с idempotency key.
 - Upload и хранение web-фото в `MEDIA_ROOT` + обратная совместимость legacy `file_id`.
 - Каталог тегов берётся из БД (`tags`) и seed-ится полным каталогом.
 - Есть `/map` + `/api/map/locations` для просмотра approved locations.
+- На `/map` есть поиск по названию/описанию и фильтр по тегу.
 - Есть login/logout и session-cookie, `/add-location` и write API защищены.
 
 ### Runtime требования для submit

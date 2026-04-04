@@ -54,6 +54,15 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         finally:
             main.validate_telegram_init_data = old_validate
 
+    def test_telegram_login_failure(self):
+        old_validate = main.validate_telegram_init_data
+        main.validate_telegram_init_data = lambda init_data: (_ for _ in ()).throw(HTTPException(status_code=403, detail='bad'))
+        try:
+            with self.assertRaises(HTTPException):
+                asyncio.run(main.login_telegram_page(SimpleNamespace(), init_data='bad', next='/'))
+        finally:
+            main.validate_telegram_init_data = old_validate
+
     def test_map_route_renders(self):
         req = SimpleNamespace(cookies={})
         response = asyncio.run(main.map_page(req))
@@ -63,8 +72,9 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         old_conn = map_api.get_connection
 
         class C:
-            def execute(self, q):
+            def execute(self, q, params=None):
                 _ = q
+                self.params = params
             def fetchall(self):
                 return [(1, 'A', 'D', 1.0, 2.0, 'legacy-id', 'telegram', None, 'tag1, tag2')]
             def __enter__(self): return self
@@ -79,6 +89,32 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             result = map_api.approved_locations()
             self.assertEqual(result[0]['id'], 1)
             self.assertIn('tag1', result[0]['tags'])
+        finally:
+            map_api.get_connection = old_conn
+
+    def test_map_api_accepts_search_and_tag_filters(self):
+        old_conn = map_api.get_connection
+
+        class C:
+            def execute(self, q, params=None):
+                self.query = q
+                self.params = params
+            def fetchall(self):
+                return []
+            def __enter__(self): return self
+            def __exit__(self, a,b,c): return False
+        class Conn:
+            def __init__(self): self.cursor_obj = C()
+            def cursor(self): return self.cursor_obj
+            def __enter__(self): return self
+            def __exit__(self,a,b,c): return False
+
+        holder = Conn()
+        map_api.get_connection = lambda: holder
+        try:
+            map_api.approved_locations(q='park', tag='кафе')
+            self.assertIn('lower(l.name)', holder.cursor_obj.query.lower())
+            self.assertEqual(holder.cursor_obj.params[-1], 'кафе')
         finally:
             map_api.get_connection = old_conn
 

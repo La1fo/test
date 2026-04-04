@@ -82,6 +82,24 @@
     });
   }
 
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setStatus('Геолокация недоступна в этом браузере', true);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        pickerMap.setView([lat, lng], 15);
+        if (!marker) marker = L.marker([lat, lng]).addTo(pickerMap);
+        else marker.setLatLng([lat, lng]);
+        setCoordinates(lat, lng);
+      },
+      () => setStatus('Не удалось определить геопозицию', true),
+    );
+  }
+
   function toggleTag(tagId) {
     if (state.tags.has(tagId)) {
       state.tags.delete(tagId);
@@ -246,6 +264,7 @@
   }
 
   document.getElementById('previewBtn').addEventListener('click', runPreview);
+  document.getElementById('myLocationBtn').addEventListener('click', useMyLocation);
   photoInput.addEventListener('change', uploadSelectedPhotos);
   document.getElementById('addLocationForm').addEventListener('submit', async (event) => {
     event.preventDefault();

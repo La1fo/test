@@ -110,6 +110,12 @@ class TestTemplates(unittest.TestCase):
             self.assertIn(token, page)
         self.assertIn('/static/add-location.js', page)
 
+    def test_geolocation_hooks_present(self):
+        add_js = Path("/workspace/test/frontend/add-location.js").read_text()
+        map_page = self._read("map.html")
+        self.assertIn("navigator.geolocation", add_js)
+        self.assertIn("navigator.geolocation", map_page)
+
 
 if __name__ == "__main__":
     unittest.main()
