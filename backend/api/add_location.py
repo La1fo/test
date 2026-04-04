@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
+from .. import add_location_contract as contract
 from ..schemas import (
     AddLocationFormConfigResponse,
     AddLocationPreviewRequest,
@@ -10,31 +11,16 @@ from ..schemas import (
 
 router = APIRouter()
 
-# Integration-shell catalog for writer-side handoff.
-DEFAULT_TAG_CATALOG = [
-    {"id": "ramp", "label": "Пандус"},
-    {"id": "parking", "label": "Парковка"},
-    {"id": "toilet", "label": "Туалет"},
-    {"id": "entrance", "label": "Вход"},
-    {"id": "elevator", "label": "Лифт"},
-    {"id": "staff_help", "label": "Помощь персонала"},
-    {"id": "navigation", "label": "Навигация"},
-]
-
-
 @router.get("/form-config", response_model=AddLocationFormConfigResponse)
 def get_add_location_form_config() -> AddLocationFormConfigResponse:
     return AddLocationFormConfigResponse(
-        writer_integration_enabled=False,
-        max_tags=5,
-        max_photos=8,
-        max_photo_size_mb=10,
-        allowed_photo_mime=["image/jpeg", "image/png", "image/webp"],
-        tag_catalog=DEFAULT_TAG_CATALOG,
-        submit_message=(
-            "Форма готова к интеграции с writer-side backend. "
-            "Финальная отправка в shared БД пока отключена на reader-side сайте."
-        ),
+        writer_integration_enabled=contract.INTEGRATION_ENABLED,
+        max_tags=contract.MAX_TAGS,
+        max_photos=contract.MAX_PHOTOS,
+        max_photo_size_mb=contract.MAX_PHOTO_SIZE_MB,
+        allowed_photo_mime=contract.ALLOWED_PHOTO_MIME,
+        tag_catalog=contract.TAG_CATALOG,
+        submit_message=contract.SUBMIT_DISABLED_MESSAGE,
     )
 
 
@@ -43,9 +29,7 @@ def build_preview(payload: AddLocationPreviewRequest) -> AddLocationPreviewRespo
     return AddLocationPreviewResponse(
         valid=True,
         normalized=payload,
-        warnings=[
-            "Это preview в integration-shell режиме: запись в shared БД здесь не выполняется.",
-        ],
+        warnings=[contract.PREVIEW_WARNING],
     )
 
 
@@ -54,8 +38,5 @@ def submit_stub(payload: AddLocationSubmitRequest) -> AddLocationSubmitResponse:
     _ = payload
     raise HTTPException(
         status_code=501,
-        detail=(
-            "Writer-side integration not connected in this repository. "
-            "Use writer backend submission service when available."
-        ),
+        detail=contract.SUBMIT_NOT_CONNECTED_DETAIL,
     )

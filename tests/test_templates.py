@@ -31,6 +31,10 @@ class TestTemplates(unittest.TestCase):
         for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html"]:
             self.assertNotIn('href="/login"', self._read(file_name))
 
+    def test_nav_has_add_location_link_on_key_pages(self):
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]:
+            self.assertIn('href="/add-location"', self._read(file_name))
+
     def test_achievements_page_no_old_slogan(self):
         achievements = self._read("achievements.html")
         self.assertNotIn("Собирайте баллы, получайте награды и становитесь легендой города.", achievements)
@@ -100,6 +104,7 @@ class TestTemplates(unittest.TestCase):
         page = self._read("add-location.html")
         for token in ["1. Название", "2. Описание", "3. Координаты", "4. Теги", "5. Фото", "6. Preview"]:
             self.assertIn(token, page)
+        self.assertIn('/static/add-location.js', page)
 
 
 if __name__ == "__main__":

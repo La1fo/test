@@ -1,6 +1,8 @@
 from typing import Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
+
+from . import add_location_contract as contract
 
 
 class UserCreate(BaseModel):
@@ -55,7 +57,7 @@ class PhotoMeta(BaseModel):
     temp_id: str = Field(min_length=1, max_length=128)
     filename: str = Field(min_length=1, max_length=255)
     mime_type: str = Field(min_length=1, max_length=100)
-    size_bytes: int = Field(gt=0, le=10 * 1024 * 1024)
+    size_bytes: int = Field(gt=0, le=contract.MAX_PHOTO_SIZE_BYTES)
 
 
 class AddLocationBasePayload(BaseModel):
@@ -77,8 +79,8 @@ class AddLocationBasePayload(BaseModel):
     @classmethod
     def validate_tags(cls, value: list[str]) -> list[str]:
         cleaned = [tag.strip() for tag in value if tag.strip()]
-        if len(cleaned) > 5:
-            raise ValueError("no more than 5 tags allowed")
+        if len(cleaned) > contract.MAX_TAGS:
+            raise ValueError(f"no more than {contract.MAX_TAGS} tags allowed")
         if len(set(cleaned)) != len(cleaned):
             raise ValueError("duplicate tags are not allowed")
         return cleaned
@@ -88,8 +90,8 @@ class AddLocationBasePayload(BaseModel):
     def validate_photos(cls, value: list[PhotoMeta]) -> list[PhotoMeta]:
         if not value:
             raise ValueError("at least one photo is required")
-        if len(value) > 8:
-            raise ValueError("no more than 8 photos allowed")
+        if len(value) > contract.MAX_PHOTOS:
+            raise ValueError(f"no more than {contract.MAX_PHOTOS} photos allowed")
         return value
 
 

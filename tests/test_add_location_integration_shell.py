@@ -1,10 +1,12 @@
 import asyncio
 import unittest
+from pathlib import Path
 
 from fastapi import HTTPException
 from pydantic import ValidationError
 
 from backend import main
+from backend import add_location_contract as contract
 from backend.api import add_location
 from backend.schemas import AddLocationPreviewRequest, AddLocationSubmitRequest
 
@@ -39,10 +41,12 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
 
     def test_form_config_contract(self):
         config = add_location.get_add_location_form_config()
-        self.assertFalse(config.writer_integration_enabled)
-        self.assertEqual(config.max_tags, 5)
-        self.assertEqual(config.max_photos, 8)
-        self.assertGreater(len(config.tag_catalog), 0)
+        self.assertEqual(config.writer_integration_enabled, contract.INTEGRATION_ENABLED)
+        self.assertEqual(config.max_tags, contract.MAX_TAGS)
+        self.assertEqual(config.max_photos, contract.MAX_PHOTOS)
+        self.assertEqual(config.max_photo_size_mb, contract.MAX_PHOTO_SIZE_MB)
+        self.assertEqual(config.allowed_photo_mime, contract.ALLOWED_PHOTO_MIME)
+        self.assertEqual(config.tag_catalog, contract.TAG_CATALOG)
 
     def test_preview_success(self):
         payload = AddLocationPreviewRequest(**self._valid_payload())
@@ -79,6 +83,25 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         paths = {route.path for route in main.app.routes}
         for required in ["/", "/leaderboard", "/faq", "/profile/{user_id}"]:
             self.assertIn(required, paths)
+
+    def test_readme_runtime_routes_match_current_main_runtime(self):
+        readme = Path("/workspace/test/README.md").read_text()
+        runtime_section = readme.split("## Runtime: какие VIEW использует сайт", 1)[1].split("##", 1)[0]
+        self.assertIn("/leaderboard", runtime_section)
+        self.assertIn("/profile/{user_id}", runtime_section)
+        self.assertIn("/achievements", runtime_section)
+        self.assertIn("/add-location", runtime_section)
+        self.assertNotIn("/auth/telegram", runtime_section)
+        self.assertNotIn("/auth/email/login", runtime_section)
+
+    def test_preview_template_is_human_readable_not_raw_json_dump(self):
+        page = Path("/workspace/test/frontend/add-location.html").read_text()
+        self.assertIn("<strong>Название:</strong>", page)
+        self.assertIn("<strong>Описание:</strong>", page)
+        self.assertIn("<strong>Координаты:</strong>", page)
+        self.assertIn("<strong>Теги:</strong>", page)
+        self.assertIn("<strong>Фото:</strong>", page)
+        self.assertNotIn("JSON.stringify(data.normalized", page)
 
 
 if __name__ == "__main__":

@@ -102,9 +102,6 @@
 - `/leaderboard` → `site_leaderboard`
 - `/profile/{user_id}` → `site_public_users`
 - `/achievements` → `site_achievements_overview`
-- `/auth/telegram` → `site_auth_users`
-- `/auth/email/login` → `site_auth_users`
-- `/auth/email/register` → отключён на reader-side (`403`)
 - `/add-location` → integration-shell UI (без записи в shared БД)
 
 ## Startup diagnostics
@@ -124,9 +121,10 @@
    - `/leaderboard`
    - `/profile/{user_id}`
    - `/achievements`
-4. Проверить auth reader-flow:
-   - `/auth/telegram` и `/auth/email/login` читают только `site_auth_users`
-   - `/auth/email/register` возвращает `403`
+4. Проверить add-location integration-shell:
+   - `/add-location` рендерится
+   - `/api/add-location/form-config` и `/api/add-location/preview` доступны
+   - `/api/add-location/submit` честно возвращает `501` до подключения writer backend
 
 ## Add-location integration shell (подготовка к writer-side)
 В этом репозитории добавлен **подготовительный слой** для будущего writer-side add-location flow:
@@ -154,3 +152,7 @@
   успешный ответ с идентификатором pending-локации.
 - Ошибки валидации/авторизации/идемпотентности должны возвращаться как структурированные API-ошибки.
 - Текущий integration-shell UI не должен меняться, подключается только реальный writer backend.
+
+## Auth note for this runtime
+- В текущем `backend/main.py` подключены HTML-роуты и `/api/add-location/*`.
+- Модуль `backend/api/auth.py` присутствует, но его роутер в `main.py` сейчас не смонтирован.
