@@ -101,8 +101,10 @@
 ## Runtime: какие VIEW использует сайт
 - `/leaderboard` → `site_leaderboard`
 - `/profile/{user_id}` → `site_public_users`
+- `/profile/me` → protected профиль текущего пользователя
 - `/achievements` → `site_achievements_overview`
 - `/add-location` → web add-location flow
+- `/map` → карта подтверждённых локаций
 
 ## Startup diagnostics
 - `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
@@ -121,7 +123,9 @@
    - `/leaderboard`
    - `/profile/{user_id}`
    - `/achievements`
-4. Проверить add-location:
+4. Проверить auth и add-location:
+   - `/login` поддерживает email и Telegram WebApp login
+   - `/profile/me` требует сессию
    - `/add-location` рендерится
    - `/api/add-location/form-config`, `/api/add-location/upload`, `/api/add-location/preview`, `/api/add-location/submit` доступны
    - при `DB_READ_ONLY=1` submit блокируется с понятной ошибкой
@@ -138,18 +142,24 @@
 
 ### Что реализовано
 - Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
+- Выбор координат через карту (Leaflet) с маркером.
 - Client-side + server-side валидация обязательных полей.
 - Реальная запись pending-локации в write-режиме (`DB_READ_ONLY=0`).
 - Атомарный submit path с idempotency key.
 - Upload и хранение web-фото в `MEDIA_ROOT` + обратная совместимость legacy `file_id`.
+- Каталог тегов берётся из БД (`tags`) и seed-ится полным каталогом.
+- Есть `/map` + `/api/map/locations` для просмотра approved locations.
+- Есть login/logout и session-cookie, `/add-location` и write API защищены.
 
 ### Runtime требования для submit
 - `DB_READ_ONLY=0`
 - `TELEGRAM_BOT_TOKEN` задан (для проверки `X-Telegram-Init-Data`)
+- `SECRET_KEY` задан (подпись session-cookie)
 - write-права к таблицам `users`, `locations`, `tags`, `location_tags`, `photos`
 - `MEDIA_ROOT` доступен на запись
 
 ### Media и миграции
 - На старте в write-режиме вызывается `ensure_add_location_schema()`:
   - добавляются дополнительные колонки в `photos` (если отсутствуют),
-  - создаётся `site_submission_idempotency`.
+  - создаётся `site_submission_idempotency`,
+  - создаётся/синхронизируется таблица `tags` (slug/code/name/category).

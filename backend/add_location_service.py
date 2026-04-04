@@ -168,6 +168,14 @@ def _upsert_user(cur, identity: TelegramIdentity) -> int:
     return int(cur.fetchone()[0])
 
 
+def _resolve_user_by_id(cur, user_id: int) -> int:
+    cur.execute("SELECT id FROM users WHERE id = %s LIMIT 1", (user_id,))
+    row = cur.fetchone()
+    if row is None:
+        raise HTTPException(status_code=403, detail="Authenticated user not found in users table")
+    return int(row[0])
+
+
 def _resolve_db_tags(cur, tag_ids: list[str]) -> list[int]:
     if not tag_ids:
         return []
@@ -243,9 +251,10 @@ def _store_location_photo(cur, location_id: int, photo: PhotoMeta, order_index: 
     return str(dest)
 
 
-def submit_location(payload: AddLocationSubmitRequest, init_data: str) -> SubmitResult:
+def submit_location(payload: AddLocationSubmitRequest, init_data: str = "", session_user_id: int | None = None) -> SubmitResult:
     _ensure_write_allowed()
-    identity = validate_telegram_init_data(init_data)
+    identity = validate_telegram_init_data(init_data) if session_user_id is None else None
+    telegram_id_for_idempotency = identity.telegram_id if identity else int(session_user_id)
 
     moved_files: list[str] = []
     with get_connection() as conn:
@@ -254,14 +263,14 @@ def submit_location(payload: AddLocationSubmitRequest, init_data: str) -> Submit
                 _ensure_idempotency_table(cur)
                 cur.execute(
                     "SELECT location_id FROM site_submission_idempotency WHERE idempotency_key = %s AND telegram_id = %s",
-                    (payload.idempotency_key, identity.telegram_id),
+                    (payload.idempotency_key, telegram_id_for_idempotency),
                 )
                 row = cur.fetchone()
                 if row and row[0]:
                     conn.commit()
                     return SubmitResult(location_id=int(row[0]), status="pending", duplicate=True)
 
-                user_id = _upsert_user(cur, identity)
+                user_id = _upsert_user(cur, identity) if identity else _resolve_user_by_id(cur, int(session_user_id))
                 db_tag_ids = _resolve_db_tags(cur, payload.tag_ids)
                 location_id = _pending_location(cur, user_id, payload)
                 _insert_location_tags(cur, location_id, db_tag_ids)
@@ -276,7 +285,7 @@ def submit_location(payload: AddLocationSubmitRequest, init_data: str) -> Submit
                     ON CONFLICT (idempotency_key, telegram_id)
                     DO UPDATE SET location_id = EXCLUDED.location_id
                     """,
-                    (payload.idempotency_key, identity.telegram_id, location_id),
+                    (payload.idempotency_key, telegram_id_for_idempotency, location_id),
                 )
 
             conn.commit()
@@ -296,3 +305,14 @@ def resolve_photo_url(file_id: str | None, storage_type: str | None, storage_pat
     if file_id:
         return f"/api/photos/telegram/{file_id}"
     return None
+
+
+def get_tag_catalog() -> list[dict[str, str]]:
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, name, category, slug FROM tags ORDER BY category, name")
+            rows = cur.fetchall()
+    return [
+        {"id": str(row[3] or row[0]), "label": row[1], "category": row[2] or "Без категории"}
+        for row in rows
+    ]

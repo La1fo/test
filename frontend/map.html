@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Карта — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>#map { height: 70vh; border-radius: 12px; }</style>
+</head>
+<body class="site-theme">
+  <nav class="top-nav reveal">
+    <a href="/">Главная</a>
+    <a href="/map" class="active">Карта</a>
+    <a href="/add-location">Добавить</a>
+    <a href="/achievements">Достижения</a>
+    <a href="/leaderboard">Топ</a>
+    <a href="/faq">Помощь</a>
+    {% if current_user_id %}<a href="/profile/me">Мой профиль</a><a href="/logout">Выйти</a>{% else %}<a href="/login">Войти</a>{% endif %}
+  </nav>
+  <main class="page-shell">
+    <section class="surface-card">
+      <h1 class="page-title">Карта подтверждённых локаций</h1>
+      <div id="map"></div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([55.751244, 37.618423], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+    fetch('/api/map/locations').then(r => r.json()).then(items => {
+      items.forEach(loc => {
+        const marker = L.marker([loc.latitude, loc.longitude]).addTo(map);
+        const tags = (loc.tags || []).join(', ') || '—';
+        const photo = loc.photo_url ? `<img src="${loc.photo_url}" style="max-width:220px;display:block;margin-top:6px;">` : '';
+        marker.bindPopup(`<strong>${loc.name}</strong><br>${loc.description || ''}<br><small>Теги: ${tags}</small>${photo}`);
+      });
+    });
+  </script>
+  <!-- Jivo widget -->
+  <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
+</body>
+</html>

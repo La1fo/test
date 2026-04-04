@@ -162,6 +162,10 @@ class TestAddLocationService(unittest.TestCase):
 
         self.assertFalse((service.MEDIA_ROOT / "locations" / "501" / "00-a.jpg").exists())
 
+    def test_photo_resolver_supports_legacy_and_uploaded(self):
+        self.assertEqual(service.resolve_photo_url("abc", "telegram", None), "/api/photos/telegram/abc")
+        self.assertEqual(service.resolve_photo_url(None, "uploaded", "locations/1/a.jpg"), "/media/locations/1/a.jpg")
+
 
 if __name__ == "__main__":
     unittest.main()

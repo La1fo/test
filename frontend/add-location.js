@@ -13,6 +13,9 @@
   const photoPreview = document.getElementById('photoPreview');
   const previewBox = document.getElementById('preview');
   const statusBox = document.getElementById('status');
+  const coordinatesLabel = document.getElementById('coordinatesLabel');
+  let pickerMap = null;
+  let marker = null;
 
   function setStatus(text, isError = false) {
     statusBox.textContent = text;
@@ -38,13 +41,44 @@
 
   function renderTags() {
     tagList.innerHTML = '';
+    const byCategory = {};
     state.tagCatalog.forEach((tag) => {
-      const el = document.createElement('button');
-      el.type = 'button';
-      el.className = `tag-chip${state.tags.has(tag.id) ? ' active' : ''}`;
-      el.textContent = tag.label;
-      el.onclick = () => toggleTag(tag.id);
-      tagList.appendChild(el);
+      const category = tag.category || 'Прочее';
+      if (!byCategory[category]) byCategory[category] = [];
+      byCategory[category].push(tag);
+    });
+    Object.entries(byCategory).forEach(([category, tags]) => {
+      const title = document.createElement('div');
+      title.style.width = '100%';
+      title.style.fontWeight = '700';
+      title.style.marginTop = '6px';
+      title.textContent = category;
+      tagList.appendChild(title);
+      tags.forEach((tag) => {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = `tag-chip${state.tags.has(tag.id) ? ' active' : ''}`;
+        el.textContent = tag.label;
+        el.onclick = () => toggleTag(tag.id);
+        tagList.appendChild(el);
+      });
+    });
+  }
+
+  function setCoordinates(lat, lng) {
+    document.getElementById('latitude').value = lat;
+    document.getElementById('longitude').value = lng;
+    coordinatesLabel.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  }
+
+  function initMapPicker() {
+    pickerMap = L.map('pickerMap').setView([55.751244, 37.618423], 11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(pickerMap);
+    pickerMap.on('click', (event) => {
+      const { lat, lng } = event.latlng;
+      if (!marker) marker = L.marker([lat, lng]).addTo(pickerMap);
+      else marker.setLatLng([lat, lng]);
+      setCoordinates(lat, lng);
     });
   }
 
@@ -133,6 +167,7 @@
     if (!payload.description?.trim()) return 'Введите описание';
     if (payload.tag_ids.length > state.maxTags) return `Можно выбрать максимум ${state.maxTags} тегов`;
     if (!payload.photos.length) return 'Загрузите хотя бы одно фото';
+    if (!Number.isFinite(payload.coordinates.latitude) || !Number.isFinite(payload.coordinates.longitude)) return 'Выберите точку на карте';
     if (payload.coordinates.latitude < -90 || payload.coordinates.latitude > 90) return 'Некорректная широта';
     if (payload.coordinates.longitude < -180 || payload.coordinates.longitude > 180) return 'Некорректная долгота';
     return null;
@@ -217,5 +252,6 @@
     await submit();
   });
 
+  initMapPicker();
   loadConfig().catch(() => setStatus('Не удалось загрузить конфигурацию формы', true));
 })();

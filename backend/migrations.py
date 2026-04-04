@@ -3,6 +3,7 @@
 Idempotent helpers for environments where write path is enabled.
 """
 
+from . import add_location_contract as contract
 from .database import get_connection
 
 
@@ -31,4 +32,25 @@ def ensure_add_location_schema() -> None:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tags (
+                  id BIGSERIAL PRIMARY KEY,
+                  slug TEXT UNIQUE NOT NULL,
+                  code TEXT UNIQUE,
+                  name TEXT NOT NULL,
+                  category TEXT
+                )
+                """
+            )
+            for item in contract.TAG_CATALOG:
+                cur.execute(
+                    """
+                    INSERT INTO tags (slug, code, name, category)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (slug) DO UPDATE
+                    SET code = EXCLUDED.code, name = EXCLUDED.name, category = EXCLUDED.category
+                    """,
+                    (item["id"], item["id"], item["label"], item["category"]),
+                )
         conn.commit()

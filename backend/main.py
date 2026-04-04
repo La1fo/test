@@ -2,14 +2,17 @@ import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Body, FastAPI, Request
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .api import add_location
+from .api import add_location, map as map_api
+from .add_location_service import validate_telegram_init_data
+from .api.auth import login_email
 from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_add_location_schema
+from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
 
 load_dotenv()
 
@@ -25,6 +28,7 @@ os.makedirs(media_path, exist_ok=True)
 app.mount("/media", StaticFiles(directory=media_path), name="media")
 templates = Jinja2Templates(directory=frontend_path)
 app.include_router(add_location.router, prefix="/api/add-location", tags=["add-location"])
+app.include_router(map_api.router, prefix="/api/map", tags=["map"])
 
 WRITER_RANK_NAMES = (
     "🟢 Исследователь 1",
@@ -247,6 +251,7 @@ def get_context(request: Request):
     return {
         "request": request,
         "bot_username": os.getenv("TELEGRAM_BOT_USERNAME", "FrendlyMapBot"),
+        "current_user_id": get_current_user_id(request, required=False),
     }
 
 
@@ -258,6 +263,30 @@ async def home(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", get_context(request))
+
+
+@app.post("/api/session/email")
+async def login_email_page(request: Request, email: str = Body(...), password: str = Body(...), next: str = Body("/")):
+    result = login_email(email=email, password=password)
+    response = RedirectResponse(url=next or "/", status_code=303)
+    response.set_cookie(SESSION_COOKIE_NAME, create_session_cookie(result["user_id"]), httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/api/session/telegram")
+async def login_telegram_page(request: Request, init_data: str = Body(...), next: str = Body("/")):
+    identity = validate_telegram_init_data(init_data)
+    result = {"user_id": identity.telegram_id}
+    response = RedirectResponse(url=next or "/", status_code=303)
+    response.set_cookie(SESSION_COOKIE_NAME, create_session_cookie(result["user_id"]), httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse(url="/", status_code=303)
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
 
 
 @app.get("/achievements", response_class=HTMLResponse)
@@ -286,7 +315,20 @@ async def faq_page(request: Request):
 
 @app.get("/add-location", response_class=HTMLResponse)
 async def add_location_page(request: Request):
+    if get_current_user_id(request, required=False) is None:
+        return RedirectResponse(url="/login?next=/add-location", status_code=303)
     return templates.TemplateResponse("add-location.html", get_context(request))
+
+
+@app.get("/map", response_class=HTMLResponse)
+async def map_page(request: Request):
+    return templates.TemplateResponse("map.html", get_context(request))
+
+
+@app.get("/profile/me", response_class=HTMLResponse)
+async def my_profile_page(request: Request):
+    user_id = get_current_user_id(request, required=True)
+    return await profile_page(request, user_id)
 
 
 @app.get("/profile/{user_id}", response_class=HTMLResponse)
