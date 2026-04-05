@@ -57,6 +57,8 @@ def approved_locations(q: str | None = None, tag: str | None = None):
 def map_tags():
     try:
         tags = get_tag_catalog()
+        if not tags:
+            tags = list(contract.TAG_CATALOG)
     except Exception:
         tags = list(contract.TAG_CATALOG)
     return {"tags": tags}

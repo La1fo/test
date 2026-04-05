@@ -63,22 +63,32 @@ def ensure_auth_schema() -> None:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                CREATE TABLE IF NOT EXISTS site_auth_accounts (
-                  id BIGSERIAL PRIMARY KEY,
-                  user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
-                  email TEXT UNIQUE,
-                  hashed_password TEXT NOT NULL,
-                  telegram_id BIGINT UNIQUE,
-                  created_at TIMESTAMPTZ DEFAULT NOW(),
-                  updated_at TIMESTAMPTZ DEFAULT NOW(),
-                  CHECK (email IS NOT NULL OR telegram_id IS NOT NULL)
-                )
+                ALTER TABLE IF EXISTS users
+                ADD COLUMN IF NOT EXISTS email TEXT,
+                ADD COLUMN IF NOT EXISTS password_hash TEXT,
+                ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS approved_locations INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS rejected_locations INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS moderation_locations INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS achievements_count INTEGER DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS show_name_on_map BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS notify_points BOOLEAN DEFAULT TRUE,
+                ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'ru',
+                ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'
                 """
             )
             cur.execute(
                 """
-                CREATE INDEX IF NOT EXISTS idx_site_auth_accounts_email_lower
-                ON site_auth_accounts (LOWER(email))
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique
+                ON users (LOWER(email))
+                WHERE email IS NOT NULL
+                """
+            )
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id_unique
+                ON users (telegram_id)
+                WHERE telegram_id IS NOT NULL
                 """
             )
             cur.execute(
@@ -91,13 +101,12 @@ def ensure_auth_schema() -> None:
                   ) THEN
                     EXECUTE format(
                       'CREATE VIEW %I AS
-                        SELECT a.user_id,
+                        SELECT u.id AS user_id,
                                u.username,
-                               a.telegram_id,
-                               a.email,
-                               a.hashed_password
-                        FROM site_auth_accounts a
-                        JOIN users u ON u.id = a.user_id',
+                               u.telegram_id,
+                               u.email,
+                               u.password_hash AS hashed_password
+                        FROM users u',
                       %s
                     );
                   END IF;

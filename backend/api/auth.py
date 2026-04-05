@@ -1,5 +1,4 @@
 import os
-import secrets
 
 from fastapi import APIRouter, Body, HTTPException
 
@@ -10,7 +9,6 @@ from ..security import create_access_token, get_password_hash, verify_password, 
 router = APIRouter()
 
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-SITE_AUTH_TABLE = os.getenv("SITE_AUTH_TABLE", "site_auth_accounts").strip()
 
 
 def _normalize_email(email: str) -> str:
@@ -60,41 +58,14 @@ def _insert_user(cur, username: str, telegram_id: int | None = None) -> int:
     return int(cur.fetchone()[0])
 
 
-def _upsert_auth_account(
-    cur,
-    *,
-    user_id: int,
-    email: str | None,
-    hashed_password: str | None,
-    telegram_id: int | None,
-) -> None:
-    safe_hash = hashed_password or get_password_hash(secrets.token_urlsafe(32))
-    cur.execute(
-        f"""
-        INSERT INTO {SITE_AUTH_TABLE} (user_id, email, hashed_password, telegram_id)
-        VALUES (%s, %s, %s, %s)
-        ON CONFLICT (user_id) DO UPDATE SET
-            email = COALESCE(EXCLUDED.email, {SITE_AUTH_TABLE}.email),
-            hashed_password = COALESCE(EXCLUDED.hashed_password, {SITE_AUTH_TABLE}.hashed_password),
-            telegram_id = COALESCE(EXCLUDED.telegram_id, {SITE_AUTH_TABLE}.telegram_id),
-            updated_at = NOW()
-        """,
-        (user_id, email, safe_hash, telegram_id),
-    )
-
-
 def _find_user_by_email(cur, email: str):
     users_view = get_db_contract().auth_users_view
     normalized = _normalize_email(email)
     cur.execute(
         f"""
         SELECT user_id, hashed_password
-        FROM (
-            SELECT user_id, hashed_password, LOWER(email) AS norm_email FROM {users_view}
-            UNION ALL
-            SELECT user_id, hashed_password, LOWER(email) AS norm_email FROM {SITE_AUTH_TABLE}
-        ) src
-        WHERE norm_email = %s
+        FROM {users_view}
+        WHERE LOWER(email) = %s
         LIMIT 1
         """,
         (normalized,),
@@ -118,18 +89,39 @@ def register_email_account(*, username: str, email: str, password: str) -> int:
                 cur.execute("SELECT id FROM users WHERE LOWER(username) = LOWER(%s) LIMIT 1", (username.strip(),))
                 if cur.fetchone():
                     raise HTTPException(status_code=409, detail="Username already exists")
-                cur.execute(f"SELECT user_id FROM {SITE_AUTH_TABLE} WHERE LOWER(email) = %s LIMIT 1", (normalized_email,))
+                cur.execute("SELECT id FROM users WHERE LOWER(email) = %s LIMIT 1", (normalized_email,))
                 if cur.fetchone():
                     raise HTTPException(status_code=409, detail="Email already exists")
-
-                user_id = _insert_user(cur, username=username.strip(), telegram_id=None)
-                _upsert_auth_account(
-                    cur,
-                    user_id=user_id,
-                    email=normalized_email,
-                    hashed_password=get_password_hash(password),
-                    telegram_id=None,
+                cols = _users_columns(cur)
+                required_defaults = {
+                    "email": normalized_email,
+                    "password_hash": get_password_hash(password),
+                    "email_verified": False,
+                    "total_gp": 0,
+                    "pts": 0,
+                    "points": 0,
+                    "approved_locations": 0,
+                    "rejected_locations": 0,
+                    "moderation_locations": 0,
+                    "achievements_count": 0,
+                    "show_name_on_map": True,
+                    "notify_points": True,
+                    "language": "ru",
+                    "theme": "light",
+                    "telegram_id": None,
+                }
+                fields = ["username"]
+                values: list[object] = [username.strip()]
+                for key, value in required_defaults.items():
+                    if key in cols:
+                        fields.append(key)
+                        values.append(value)
+                placeholders = ", ".join(["%s"] * len(values))
+                cur.execute(
+                    f"INSERT INTO users ({', '.join(fields)}) VALUES ({placeholders}) RETURNING id",
+                    tuple(values),
                 )
+                user_id = int(cur.fetchone()[0])
             conn.commit()
             return user_id
         except Exception:
@@ -151,8 +143,50 @@ def ensure_telegram_user(*, telegram_id: int, username: str | None, first_name: 
                 else:
                     if DB_READ_ONLY:
                         raise HTTPException(status_code=503, detail="Telegram bootstrap disabled in read-only DB mode")
-                    user_id = _insert_user(cur, username=display_username, telegram_id=telegram_id)
-                _upsert_auth_account(cur, user_id=user_id, email=None, hashed_password=None, telegram_id=telegram_id)
+                    cols = _users_columns(cur)
+                    fields = ["username"]
+                    values: list[object] = [display_username]
+                    if "telegram_id" in cols:
+                        fields.append("telegram_id")
+                        values.append(telegram_id)
+                    if "email_verified" in cols:
+                        fields.append("email_verified")
+                        values.append(False)
+                    if "total_gp" in cols:
+                        fields.append("total_gp")
+                        values.append(0)
+                    if "moderation_locations" in cols:
+                        fields.append("moderation_locations")
+                        values.append(0)
+                    if "show_name_on_map" in cols:
+                        fields.append("show_name_on_map")
+                        values.append(True)
+                    if "notify_points" in cols:
+                        fields.append("notify_points")
+                        values.append(True)
+                    if "language" in cols:
+                        fields.append("language")
+                        values.append("ru")
+                    if "theme" in cols:
+                        fields.append("theme")
+                        values.append("light")
+                    placeholders = ", ".join(["%s"] * len(values))
+                    cur.execute(
+                        f"INSERT INTO users ({', '.join(fields)}) VALUES ({placeholders}) RETURNING id",
+                        tuple(values),
+                    )
+                    user_id = int(cur.fetchone()[0])
+                if not DB_READ_ONLY:
+                    cur.execute(
+                        """
+                        UPDATE users
+                        SET username = COALESCE(NULLIF(%s, ''), username),
+                            first_name = COALESCE(%s, first_name),
+                            last_name = COALESCE(%s, last_name)
+                        WHERE id = %s
+                        """,
+                        (display_username, first_name, last_name, user_id),
+                    )
             conn.commit()
             return user_id
         except Exception:

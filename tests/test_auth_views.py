@@ -111,7 +111,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
             def fetchone(self):
                 if "where lower(username)" in self._last_query:
                     return None
-                if "from site_auth_accounts where lower(email)" in self._last_query:
+                if "where lower(email)" in self._last_query and "from users" in self._last_query:
                     return None
                 if "returning id" in self._last_query and "insert into users" in self._last_query:
                     return (501,)
@@ -139,7 +139,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
             self.assertTrue(conn.committed)
             self.assertFalse(conn.rolled_back)
             self.assertTrue(any("insert into users" in q for q, _ in calls))
-            self.assertTrue(any("insert into site_auth_accounts" in q for q, _ in calls))
+            self.assertFalse(any("insert into site_auth_accounts" in q for q, _ in calls))
         finally:
             auth.get_connection = old_conn
             auth.DB_READ_ONLY = old_ro
@@ -161,7 +161,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
             def fetchone(self):
                 if "where lower(username)" in self._last_query:
                     return None
-                if "from site_auth_accounts where lower(email)" in self._last_query:
+                if "where lower(email)" in self._last_query and "from users" in self._last_query:
                     return (1,)
                 return None
 
@@ -226,7 +226,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
         try:
             result = auth.login_email(email="new@example.com", password="supersecret")
             self.assertEqual(result["user_id"], 700)
-            self.assertIn("site_auth_accounts", cursor._last_query)
+            self.assertIn(self.contract.auth_users_view, cursor._last_query)
         finally:
             auth.get_connection = old_conn
             auth.get_db_contract = old_contract
@@ -278,7 +278,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
             user_id = auth.ensure_telegram_user(telegram_id=1234, username="tg_u", first_name="Tg", last_name=None)
             self.assertEqual(user_id, 333)
             self.assertTrue(any("insert into users" in q for q in calls))
-            self.assertTrue(any("insert into site_auth_accounts" in q for q in calls))
+            self.assertFalse(any("insert into site_auth_accounts" in q for q in calls))
         finally:
             auth.get_connection = old_conn
             auth.DB_READ_ONLY = old_ro

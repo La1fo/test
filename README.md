@@ -125,7 +125,7 @@
    - `/achievements`
 4. Проверить auth, add-location и map:
    - `/login` поддерживает email login, email registration и Telegram WebApp login
-   - `POST /api/session/register` создаёт `users` + `site_auth_accounts` в одной транзакции и ставит session cookie
+   - `POST /api/session/register` создаёт `users` row (email/password_hash) в одной транзакции и ставит session cookie
    - `/api/session/me` возвращает состояние web-сессии (`authenticated`, `user_id`)
    - `/profile/me` требует сессию
    - `/add-location` рендерится
@@ -162,8 +162,8 @@
 - Категории тегов отображаются и в add-location (чипы), и в map filter (grouped select).
 - Есть login/logout и session-cookie, `/add-location` и write API защищены.
 - `POST /api/session/email` и `POST /api/session/telegram` поддерживают `next` и устанавливают signed cookie `fm_session`.
-- Registration flow: `POST /api/session/register` создаёт запись в `users`, затем в `site_auth_accounts`, и сразу авторизует пользователя cookie-сессией.
-- Telegram login синхронизирует user identity в `users`/`site_auth_accounts` (или использует существующую запись в read-only режиме).
+- Registration flow: `POST /api/session/register` пишет напрямую в `users` (`email`, `password_hash`, default auth/profile поля) и сразу авторизует пользователя cookie-сессией.
+- Telegram login синхронизирует user identity напрямую в `users` (или использует существующую запись в read-only режиме).
 
 ### Runtime требования для submit
 - `DB_READ_ONLY=0`
@@ -176,7 +176,6 @@
 - `SECRET_KEY` — обязателен для подписи web cookie-сессий.
 - `SESSION_TTL_SECONDS` — TTL cookie-сессии (по умолчанию 86400 секунд).
 - `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
-- `SITE_AUTH_TABLE` — writable auth table для email/telegram credentials (по умолчанию `site_auth_accounts`).
 
 ### Media и миграции
 - На старте в write-режиме вызывается `ensure_add_location_schema()`:
@@ -185,14 +184,14 @@
   - создаётся/синхронизируется таблица `tags` (slug/code/name/category),
   - выполняется idempotent upsert полного bot tag catalog.
 - На старте в write-режиме вызывается `ensure_auth_schema()`:
-  - создаётся writable таблица `site_auth_accounts` (user_id/email/hashed_password/telegram_id),
-  - создаётся индекс `LOWER(email)`,
-  - если `site_auth_users` view отсутствует — создаётся fallback view на основе `site_auth_accounts + users`.
+  - добавляются (если отсутствуют) auth/profile поля в `users` (`email`, `password_hash`, `email_verified`, и др.),
+  - создаются индексы `LOWER(email)` и `telegram_id` для уникальности non-null значений,
+  - если `site_auth_users` view отсутствует — создаётся fallback view на основе `users`.
 
 ## DB роли для write-capable сайта
 Рекомендуется отдельная роль, например `friendly_site_rw`:
 - `SELECT` на `site_*` view,
-- `INSERT/UPDATE` на `users`, `locations`, `photos`, `tags`, `location_tags`, `site_submission_idempotency`, `site_auth_accounts`,
+- `INSERT/UPDATE` на `users`, `locations`, `photos`, `tags`, `location_tags`, `site_submission_idempotency`,
 - права на соответствующие sequence (`USAGE`, `SELECT`, при необходимости `UPDATE`).
 
 При `DB_READ_ONLY=1`:

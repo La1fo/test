@@ -20,6 +20,8 @@ router = APIRouter()
 def get_add_location_form_config() -> AddLocationFormConfigResponse:
     try:
         tag_catalog = get_tag_catalog()
+        if not tag_catalog:
+            tag_catalog = list(contract.TAG_CATALOG)
     except Exception:
         tag_catalog = list(contract.TAG_CATALOG)
     return AddLocationFormConfigResponse(

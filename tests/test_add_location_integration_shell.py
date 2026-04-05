@@ -66,6 +66,15 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         self.assertEqual(config.tag_catalog, contract.TAG_CATALOG)
         self.assertGreaterEqual(len(config.tag_catalog), 50)
 
+    def test_form_config_uses_fallback_when_db_catalog_empty(self):
+        old_catalog = add_location.get_tag_catalog
+        add_location.get_tag_catalog = lambda: []
+        try:
+            config = add_location.get_add_location_form_config()
+            self.assertEqual(len(config.tag_catalog), len(contract.TAG_CATALOG))
+        finally:
+            add_location.get_tag_catalog = old_catalog
+
     def test_form_config_and_map_tags_use_same_db_source(self):
         db_catalog = [
             {"id": "cafe", "label": "кафе", "category": "Еда"},

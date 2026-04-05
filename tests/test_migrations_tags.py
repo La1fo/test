@@ -83,8 +83,8 @@ class TestMigrationsTagCatalog(unittest.TestCase):
             migrations.get_db_contract = old_contract
 
         queries = [q for q, _ in cursor.calls]
-        self.assertTrue(any("create table if not exists site_auth_accounts" in q for q in queries))
-        self.assertTrue(any("idx_site_auth_accounts_email_lower" in q for q in queries))
+        self.assertTrue(any("alter table if exists users" in q for q in queries))
+        self.assertTrue(any("idx_users_email_lower_unique" in q for q in queries))
 
 
 if __name__ == "__main__":

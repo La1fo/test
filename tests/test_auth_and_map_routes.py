@@ -80,6 +80,27 @@ class TestAuthAndMapRoutes(unittest.TestCase):
                 )
             )
 
+    def test_register_invalid_email_bubbles(self):
+        old_register = main.register_email_account
+        old_ro = main.DB_READ_ONLY
+        main.DB_READ_ONLY = False
+        main.register_email_account = lambda **kwargs: (_ for _ in ()).throw(HTTPException(status_code=400, detail="Invalid email format"))
+        try:
+            with self.assertRaises(HTTPException):
+                asyncio.run(
+                    main.register_email_page(
+                        SimpleNamespace(),
+                        username="user1",
+                        email="bad",
+                        password="secret123",
+                        confirm_password="secret123",
+                        next="/profile/me",
+                    )
+                )
+        finally:
+            main.register_email_account = old_register
+            main.DB_READ_ONLY = old_ro
+
     def test_register_blocked_in_read_only_mode(self):
         old_ro = main.DB_READ_ONLY
         main.DB_READ_ONLY = True
@@ -177,6 +198,15 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             payload = map_api.map_tags()
             self.assertEqual(len(payload["tags"]), len(contract.TAG_CATALOG))
             self.assertEqual(payload["tags"][0]["category"], contract.TAG_CATALOG[0]["category"])
+        finally:
+            map_api.get_tag_catalog = old_catalog
+
+    def test_map_tags_endpoint_fallbacks_when_db_catalog_empty(self):
+        old_catalog = map_api.get_tag_catalog
+        map_api.get_tag_catalog = lambda: []
+        try:
+            payload = map_api.map_tags()
+            self.assertEqual(len(payload["tags"]), len(contract.TAG_CATALOG))
         finally:
             map_api.get_tag_catalog = old_catalog
 
