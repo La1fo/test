@@ -9,9 +9,9 @@ from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
 from .add_location_service import validate_telegram_init_data
-from .api.auth import login_email
+from .api.auth import ensure_telegram_user, login_email, register_email_account
 from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
-from .migrations import ensure_add_location_schema
+from .migrations import ensure_add_location_schema, ensure_auth_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
 
 load_dotenv()
@@ -121,6 +121,7 @@ def startup_contract_check() -> None:
         raise RuntimeError(error)
     if not DB_READ_ONLY:
         ensure_add_location_schema()
+        ensure_auth_schema()
 
 
 def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
@@ -293,12 +294,38 @@ async def login_email_page(request: Request, email: str = Body(...), password: s
     return response
 
 
+@app.post("/api/session/register")
+async def register_email_page(
+    request: Request,
+    username: str = Body(...),
+    email: str = Body(...),
+    password: str = Body(...),
+    confirm_password: str = Body(...),
+    next: str = Body("/profile/me"),
+):
+    _ = request
+    if DB_READ_ONLY:
+        raise HTTPException(status_code=503, detail="Registration disabled in read-only DB mode")
+    if password != confirm_password:
+        raise HTTPException(status_code=400, detail="Password confirmation does not match")
+    user_id = register_email_account(username=username, email=email, password=password)
+    response = RedirectResponse(url=_normalize_next(next, default="/profile/me"), status_code=303)
+    _set_session_cookie(response, int(user_id))
+    return response
+
+
 @app.post("/api/session/telegram")
 async def login_telegram_page(request: Request, init_data: str = Body(...), next: str = Body("/")):
     _ = request
     identity = validate_telegram_init_data(init_data)
+    user_id = ensure_telegram_user(
+        telegram_id=int(identity.telegram_id),
+        username=identity.username,
+        first_name=identity.first_name,
+        last_name=identity.last_name,
+    )
     response = RedirectResponse(url=_normalize_next(next), status_code=303)
-    _set_session_cookie(response, int(identity.telegram_id))
+    _set_session_cookie(response, int(user_id))
     return response
 
 

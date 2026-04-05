@@ -36,6 +36,12 @@ class TestTemplates(unittest.TestCase):
             self.assertIn('href="/add-location"', self._read(file_name))
             self.assertIn('href="/map"', self._read(file_name))
 
+    def test_login_page_has_registration_block(self):
+        login = self._read("login.html")
+        self.assertIn("Регистрация", login)
+        self.assertIn("regUsername", login)
+        self.assertIn("/api/session/register", login)
+
     def test_achievements_page_no_old_slogan(self):
         achievements = self._read("achievements.html")
         self.assertNotIn("Собирайте баллы, получайте награды и становитесь легендой города.", achievements)

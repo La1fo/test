@@ -45,15 +45,71 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         finally:
             main.login_email = old_login
 
+    def test_register_success_sets_cookie(self):
+        old_register = main.register_email_account
+        old_ro = main.DB_READ_ONLY
+        main.register_email_account = lambda username, email, password: 123
+        main.DB_READ_ONLY = False
+        try:
+            response = asyncio.run(
+                main.register_email_page(
+                    SimpleNamespace(),
+                    username="user1",
+                    email="u@example.com",
+                    password="secret123",
+                    confirm_password="secret123",
+                    next="/profile/me",
+                )
+            )
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("set-cookie", response.headers)
+        finally:
+            main.register_email_account = old_register
+            main.DB_READ_ONLY = old_ro
+
+    def test_register_password_mismatch(self):
+        with self.assertRaises(HTTPException):
+            asyncio.run(
+                main.register_email_page(
+                    SimpleNamespace(),
+                    username="user1",
+                    email="u@example.com",
+                    password="a",
+                    confirm_password="b",
+                    next="/profile/me",
+                )
+            )
+
+    def test_register_blocked_in_read_only_mode(self):
+        old_ro = main.DB_READ_ONLY
+        main.DB_READ_ONLY = True
+        try:
+            with self.assertRaises(HTTPException):
+                asyncio.run(
+                    main.register_email_page(
+                        SimpleNamespace(),
+                        username="user1",
+                        email="u@example.com",
+                        password="secret123",
+                        confirm_password="secret123",
+                        next="/profile/me",
+                    )
+                )
+        finally:
+            main.DB_READ_ONLY = old_ro
+
     def test_telegram_login_success(self):
         old_validate = main.validate_telegram_init_data
-        main.validate_telegram_init_data = lambda init_data: SimpleNamespace(telegram_id=99)
+        old_ensure = main.ensure_telegram_user
+        main.validate_telegram_init_data = lambda init_data: SimpleNamespace(telegram_id=99, username="tg", first_name=None, last_name=None)
+        main.ensure_telegram_user = lambda **kwargs: 199
         try:
             response = asyncio.run(main.login_telegram_page(SimpleNamespace(), init_data='ok', next='/'))
             self.assertEqual(response.status_code, 303)
             self.assertIn('set-cookie', response.headers)
         finally:
             main.validate_telegram_init_data = old_validate
+            main.ensure_telegram_user = old_ensure
 
     def test_telegram_login_failure(self):
         old_validate = main.validate_telegram_init_data

@@ -64,6 +64,28 @@ class TestMigrationsTagCatalog(unittest.TestCase):
             for label in labels:
                 self.assertIn(label, seeded_labels)
 
+    def test_ensure_auth_schema_creates_auth_table(self):
+        cursor = RecorderCursor()
+
+        @contextmanager
+        def fake_conn(dict_cursor=False):
+            _ = dict_cursor
+            yield RecorderConn(cursor)
+
+        old_conn = migrations.get_connection
+        old_contract = migrations.get_db_contract
+        migrations.get_connection = fake_conn
+        migrations.get_db_contract = lambda: type("Contract", (), {"auth_users_view": "site_auth_users"})()
+        try:
+            migrations.ensure_auth_schema()
+        finally:
+            migrations.get_connection = old_conn
+            migrations.get_db_contract = old_contract
+
+        queries = [q for q, _ in cursor.calls]
+        self.assertTrue(any("create table if not exists site_auth_accounts" in q for q in queries))
+        self.assertTrue(any("idx_site_auth_accounts_email_lower" in q for q in queries))
+
 
 if __name__ == "__main__":
     unittest.main()
