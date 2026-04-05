@@ -47,7 +47,7 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
     def test_add_location_page_renders_template(self):
         anon = SimpleNamespace(cookies={})
         response = asyncio.run(main.add_location_page(request=anon))
-        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.template.name, "add-location.html")
 
         auth_request = SimpleNamespace(cookies={SESSION_COOKIE_NAME: create_session_cookie(1)})
         response = asyncio.run(main.add_location_page(request=auth_request))

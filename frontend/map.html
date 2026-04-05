@@ -19,18 +19,16 @@
   </style>
 </head>
 <body class="site-theme">
-  <nav class="top-nav reveal">
-    <a href="/">Главная</a>
-    <a href="/map" class="active">Карта</a>
-    <a href="/add-location">Добавить</a>
-    <a href="/achievements">Достижения</a>
-    <a href="/leaderboard">Топ</a>
-    <a href="/faq">Помощь</a>
-    {% if current_user_id %}<a href="/profile/me">Мой профиль</a><a href="/logout">Выйти</a>{% else %}<a href="/login">Войти</a>{% endif %}
-  </nav>
+  {% include "_nav.html" %}
   <main class="page-shell">
     <section class="surface-card">
       <h1 class="page-title">Карта подтверждённых локаций</h1>
+      {% if not current_user_id %}
+      <div class="warning" style="margin-bottom:12px;">
+        Вы просматриваете карту как гость. Чтобы добавлять новые локации и управлять своими отправками, войдите в аккаунт.
+        <a href="/login?next=/map" style="margin-left:8px;">Войти</a>
+      </div>
+      {% endif %}
       <div class="map-controls">
         <input id="search" placeholder="Поиск по названию/описанию">
         <select id="tagFilter"><option value="">Все теги</option></select>

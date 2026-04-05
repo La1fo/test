@@ -1,4 +1,8 @@
 (() => {
+  const form = document.getElementById('addLocationForm');
+  if (!form) {
+    return;
+  }
   const state = {
     tags: new Set(),
     tagCatalog: [],
@@ -275,7 +279,7 @@
   document.getElementById('previewBtn').addEventListener('click', runPreview);
   document.getElementById('myLocationBtn').addEventListener('click', useMyLocation);
   photoInput.addEventListener('change', uploadSelectedPhotos);
-  document.getElementById('addLocationForm').addEventListener('submit', async (event) => {
+  form.addEventListener('submit', async (event) => {
     event.preventDefault();
     await submit();
   });

@@ -27,20 +27,32 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("🚀", home)
         self.assertIn("Добавляй метки и повышайте ранг", home)
 
-    def test_nav_no_login_link(self):
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html"]:
-            self.assertNotIn('href="/login"', self._read(file_name))
+    def test_nav_is_auth_aware_and_has_no_logout(self):
+        nav = self._read("_nav.html")
+        self.assertIn('href="/login"', nav)
+        self.assertIn('href="/profile/me"', nav)
+        self.assertNotIn('href="/logout"', nav)
+
+    def test_pages_use_shared_nav_include(self):
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html", "map.html"]:
+            self.assertIn('{% include "_nav.html" %}', self._read(file_name))
 
     def test_nav_has_add_location_link_on_key_pages(self):
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html"]:
-            self.assertIn('href="/add-location"', self._read(file_name))
-            self.assertIn('href="/map"', self._read(file_name))
+        nav = self._read("_nav.html")
+        self.assertIn('href="/add-location"', nav)
+        self.assertIn('href="/map"', nav)
 
     def test_login_page_has_registration_block(self):
         login = self._read("login.html")
         self.assertIn("Регистрация", login)
         self.assertIn("regUsername", login)
         self.assertIn("/api/session/register", login)
+
+    def test_logout_available_on_profile_page_only(self):
+        profile = self._read("profile.html")
+        self.assertIn("/logout?next=/", profile)
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "login.html", "add-location.html", "map.html"]:
+            self.assertNotIn("/logout?next=/", self._read(file_name))
 
     def test_achievements_page_no_old_slogan(self):
         achievements = self._read("achievements.html")
@@ -120,6 +132,7 @@ class TestTemplates(unittest.TestCase):
         self.assertIn('type="hidden"', page)
         self.assertNotIn('placeholder="Введите широту"', page)
         self.assertNotIn('placeholder="Введите долготу"', page)
+        self.assertIn("Для добавления локации нужна авторизация", page)
 
     def test_geolocation_hooks_present(self):
         add_js = Path("/workspace/test/frontend/add-location.js").read_text()
@@ -133,6 +146,7 @@ class TestTemplates(unittest.TestCase):
         self.assertIn("/api/map/tags", map_page)
         self.assertIn("loadMapTags", map_page)
         self.assertIn("optgroup", map_page)
+        self.assertIn("Вы просматриваете карту как гость", map_page)
 
 
 if __name__ == "__main__":

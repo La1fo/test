@@ -249,10 +249,14 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
 
 
 def get_context(request: Request):
+    current_user_id = get_current_user_id(request, required=False)
+    current_path = getattr(getattr(request, "url", None), "path", "")
     return {
         "request": request,
         "bot_username": os.getenv("TELEGRAM_BOT_USERNAME", "FrendlyMapBot"),
-        "current_user_id": get_current_user_id(request, required=False),
+        "current_user_id": current_user_id,
+        "is_authenticated": current_user_id is not None,
+        "current_path": current_path,
     }
 
 
@@ -370,8 +374,6 @@ async def faq_page(request: Request):
 
 @app.get("/add-location", response_class=HTMLResponse)
 async def add_location_page(request: Request):
-    if get_current_user_id(request, required=False) is None:
-        return RedirectResponse(url="/login?next=/add-location", status_code=303)
     return templates.TemplateResponse("add-location.html", get_context(request))
 
 

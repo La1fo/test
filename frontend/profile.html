@@ -4,46 +4,47 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Профиль — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
   <style>
-    body { font-family: Arial, sans-serif; background:#f3f7fb; margin:0; color:#1d2a35; }
-    .top-nav { background:#fff; padding:16px; display:flex; gap:14px; justify-content:center; box-shadow:0 2px 10px rgba(0,0,0,.08); }
-    .top-nav a { text-decoration:none; color:#0b67b2; font-weight:700; }
-    .container { max-width:860px; margin:28px auto; background:#fff; border-radius:14px; padding:24px; box-shadow:0 8px 24px rgba(0,0,0,.08); }
-    h1 { margin:0 0 16px; color:#0b67b2; }
-    .warning { background:#fff8e1; border:1px solid #ffd166; color:#7c5b00; border-radius:10px; padding:10px 12px; margin-bottom:14px; }
-    .card { background:#f7fbff; border:1px solid #dcecff; border-radius:12px; padding:16px; }
-    .row { margin:8px 0; }
-    .label { color:#667; }
+    .profile-card { background:#f7fbff; border:1px solid #dcecff; border-radius:12px; padding:16px; }
+    .profile-row { margin:8px 0; }
+    .profile-label { color:#667; }
+    .profile-actions { margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+    .btn-link { display:inline-block; padding:10px 14px; border-radius:10px; text-decoration:none; font-weight:600; }
+    .btn-primary-link { background:#0b67b2; color:#fff; }
+    .btn-secondary-link { background:#eaf3fb; color:#2f5b80; }
   </style>
 </head>
-<body>
-  <nav class="top-nav">
-    <a href="/">Главная</a>
-    <a href="/map">Карта</a>
-    <a href="/add-location">Добавить</a>
-    <a href="/achievements">Достижения</a>
-    <a href="/leaderboard">Топ</a>
-    <a href="/faq">Помощь</a>
-  </nav>
+<body class="site-theme">
+  {% include "_nav.html" %}
 
-  <div class="container">
-    <h1>Профиль</h1>
+  <main class="page-shell">
+    <section class="surface-card">
+      <h1 class="page-title">Профиль</h1>
 
-    {% if db_warning %}
-      <div class="warning">{{ db_warning }}</div>
-    {% endif %}
+      {% if db_warning %}
+        <div class="warning">{{ db_warning }}</div>
+      {% endif %}
 
-    {% if profile %}
-      <div class="card">
-        <div class="row"><span class="label">Пользователь:</span> @{{ profile.username }}</div>
-        <div class="row"><span class="label">Ранг:</span> {{ profile.rank_name }}</div>
-        <div class="row"><span class="label">GP:</span> {{ profile.gp_display }}</div>
-                <div class="row"><span class="label">Подтверждённых локаций:</span> {{ profile.approved_locations }}</div>
+      {% if profile %}
+        <div class="profile-card">
+          <div class="profile-row"><span class="profile-label">Пользователь:</span> @{{ profile.username }}</div>
+          <div class="profile-row"><span class="profile-label">Ранг:</span> {{ profile.rank_name }}</div>
+          <div class="profile-row"><span class="profile-label">GP:</span> {{ profile.gp_display }}</div>
+          <div class="profile-row"><span class="profile-label">Подтверждённых локаций:</span> {{ profile.approved_locations }}</div>
+        </div>
+      {% else %}
+        <div class="warning">Профиль не найден.</div>
+      {% endif %}
+
+      {% if current_user_id and profile and current_user_id == profile.user_id %}
+      <div class="profile-actions">
+        <a class="btn-link btn-secondary-link" href="/add-location">Добавить локацию</a>
+        <a class="btn-link btn-primary-link" href="/logout?next=/">Выйти</a>
       </div>
-    {% else %}
-      <div class="warning">Профиль не найден.</div>
-    {% endif %}
-  </div>
+      {% endif %}
+    </section>
+  </main>
   <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
 </body>

@@ -30,21 +30,21 @@
   </style>
 </head>
 <body class="site-theme">
-  <nav class="top-nav reveal">
-    <a href="/">Главная</a>
-    <a href="/map">Карта</a>
-    <a href="/add-location" class="active">Добавить</a>
-    <a href="/achievements">Достижения</a>
-    <a href="/leaderboard">Топ</a>
-    <a href="/faq">Помощь</a>
-    {% if current_user_id %}<a href="/profile/me">Мой профиль</a><a href="/logout">Выйти</a>{% else %}<a href="/login?next=/add-location">Войти</a>{% endif %}
-  </nav>
+  {% include "_nav.html" %}
 
   <main class="page-shell">
     <section class="surface-card wizard-grid">
       <h1 class="page-title">Добавление локации</h1>
+      {% if not current_user_id %}
+      <div class="warning">
+        Для добавления локации нужна авторизация.
+        <a href="/login?next=/add-location">Войти</a>
+      </div>
+      {% else %}
       <p class="muted-text">Заполните данные и отправьте новую локацию на модерацию.</p>
+      {% endif %}
 
+      {% if current_user_id %}
       <form id="addLocationForm" class="wizard-grid">
         <div class="step">
           <h3>1. Название</h3>
@@ -95,6 +95,7 @@
           <button type="submit" class="btn btn-primary">Отправить</button>
         </div>
       </form>
+      {% endif %}
     </section>
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

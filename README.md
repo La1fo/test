@@ -125,6 +125,7 @@
    - `/achievements`
 4. Проверить auth, add-location и map:
    - `/login` поддерживает email login, email registration и Telegram WebApp login
+   - navbar единый на всех страницах: guest видит `Войти`, auth user видит `Мой профиль`; кнопка `Выйти` доступна на странице профиля
    - `POST /api/session/register` создаёт `users` row (email/password_hash) в одной транзакции и ставит session cookie
    - `/api/session/me` возвращает состояние web-сессии (`authenticated`, `user_id`)
    - `/profile/me` требует сессию
@@ -164,6 +165,7 @@
 - `POST /api/session/email` и `POST /api/session/telegram` поддерживают `next` и устанавливают signed cookie `fm_session`.
 - Registration flow: `POST /api/session/register` пишет напрямую в `users` (`email`, `password_hash`, default auth/profile поля) и сразу авторизует пользователя cookie-сессией.
 - Telegram login синхронизирует user identity напрямую в `users` (или использует существующую запись в read-only режиме).
+- `/add-location` для гостя показывает понятный auth-required CTA вместо сломанного flow; `/map` для гостя показывает информационный CTA без блокировки просмотра.
 
 ### Runtime требования для submit
 - `DB_READ_ONLY=0`
