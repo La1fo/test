@@ -68,6 +68,18 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         response = asyncio.run(main.map_page(req))
         self.assertEqual(response.template.name, 'map.html')
 
+    def test_session_me_for_anonymous(self):
+        req = SimpleNamespace(cookies={})
+        response = asyncio.run(main.session_me(req))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('"authenticated":false', response.body.decode().lower())
+
+    def test_session_me_for_authorized(self):
+        req = SimpleNamespace(cookies={SESSION_COOKIE_NAME: create_session_cookie(88)})
+        response = asyncio.run(main.session_me(req))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('"user_id":88', response.body.decode().replace(" ", ""))
+
     def test_map_api_returns_payload(self):
         old_conn = map_api.get_connection
 
@@ -91,6 +103,15 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             self.assertIn('tag1', result[0]['tags'])
         finally:
             map_api.get_connection = old_conn
+
+    def test_map_tags_endpoint_uses_db_catalog(self):
+        old_catalog = map_api.get_tag_catalog
+        map_api.get_tag_catalog = lambda: [{"id": "ramp", "label": "Пандус", "category": "Доступность"}]
+        try:
+            payload = map_api.map_tags()
+            self.assertEqual(payload["tags"][0]["id"], "ramp")
+        finally:
+            map_api.get_tag_catalog = old_catalog
 
     def test_map_api_accepts_search_and_tag_filters(self):
         old_conn = map_api.get_connection

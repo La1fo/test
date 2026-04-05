@@ -2,8 +2,8 @@ import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -255,6 +255,23 @@ def get_context(request: Request):
     }
 
 
+def _normalize_next(next_url: str | None, default: str = "/") -> str:
+    candidate = (next_url or "").strip()
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    return candidate
+
+
+def _set_session_cookie(response: RedirectResponse, user_id: int) -> None:
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_session_cookie(user_id),
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("SESSION_COOKIE_SECURE", "0") == "1",
+    )
+
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", get_context(request))
@@ -267,26 +284,37 @@ async def login_page(request: Request):
 
 @app.post("/api/session/email")
 async def login_email_page(request: Request, email: str = Body(...), password: str = Body(...), next: str = Body("/")):
+    _ = request
+    if not email.strip() or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
     result = login_email(email=email, password=password)
-    response = RedirectResponse(url=next or "/", status_code=303)
-    response.set_cookie(SESSION_COOKIE_NAME, create_session_cookie(result["user_id"]), httponly=True, samesite="lax")
+    response = RedirectResponse(url=_normalize_next(next), status_code=303)
+    _set_session_cookie(response, int(result["user_id"]))
     return response
 
 
 @app.post("/api/session/telegram")
 async def login_telegram_page(request: Request, init_data: str = Body(...), next: str = Body("/")):
+    _ = request
     identity = validate_telegram_init_data(init_data)
-    result = {"user_id": identity.telegram_id}
-    response = RedirectResponse(url=next or "/", status_code=303)
-    response.set_cookie(SESSION_COOKIE_NAME, create_session_cookie(result["user_id"]), httponly=True, samesite="lax")
+    response = RedirectResponse(url=_normalize_next(next), status_code=303)
+    _set_session_cookie(response, int(identity.telegram_id))
     return response
 
 
 @app.get("/logout")
-async def logout():
-    response = RedirectResponse(url="/", status_code=303)
+async def logout(next: str | None = None):
+    response = RedirectResponse(url=_normalize_next(next), status_code=303)
     response.delete_cookie(SESSION_COOKIE_NAME)
     return response
+
+
+@app.get("/api/session/me")
+async def session_me(request: Request):
+    user_id = get_current_user_id(request, required=False)
+    if user_id is None:
+        return JSONResponse({"authenticated": False, "user_id": None})
+    return JSONResponse({"authenticated": True, "user_id": int(user_id)})
 
 
 @app.get("/achievements", response_class=HTMLResponse)

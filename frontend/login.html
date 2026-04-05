@@ -49,6 +49,10 @@
 
     async function loginViaTelegram() {
       const init_data = window.Telegram?.WebApp?.initData || '';
+      if (!init_data) {
+        status.textContent = 'Telegram init_data не найден. Откройте страницу внутри Telegram WebApp.';
+        return;
+      }
       const res = await fetch('/api/session/telegram', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({init_data, next}),
@@ -59,6 +63,11 @@
 
     document.getElementById('emailLoginBtn').addEventListener('click', loginViaEmail);
     document.getElementById('tgLoginBtn').addEventListener('click', loginViaTelegram);
+
+    // Авто-bootstrap web-сессии, если страница открыта внутри Telegram WebApp.
+    if (window.Telegram?.WebApp?.initData) {
+      loginViaTelegram();
+    }
   </script>
   <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>

@@ -116,6 +116,11 @@ class TestTemplates(unittest.TestCase):
         self.assertIn("navigator.geolocation", add_js)
         self.assertIn("navigator.geolocation", map_page)
 
+    def test_map_page_uses_db_tag_catalog_api(self):
+        map_page = self._read("map.html")
+        self.assertIn("/api/map/tags", map_page)
+        self.assertIn("loadMapTags", map_page)
+
 
 if __name__ == "__main__":
     unittest.main()

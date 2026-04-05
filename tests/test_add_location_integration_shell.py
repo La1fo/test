@@ -39,6 +39,8 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         self.assertIn("/api/add-location/submit", paths)
         self.assertIn("/map", paths)
         self.assertIn("/api/map/locations", paths)
+        self.assertIn("/api/map/tags", paths)
+        self.assertIn("/api/session/me", paths)
 
     def test_add_location_page_renders_template(self):
         anon = SimpleNamespace(cookies={})

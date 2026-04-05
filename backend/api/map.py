@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from ..add_location_service import resolve_photo_url
+from .. import add_location_contract as contract
+from ..add_location_service import get_tag_catalog, resolve_photo_url
 from ..database import get_connection
 
 router = APIRouter()
@@ -50,3 +51,12 @@ def approved_locations(q: str | None = None, tag: str | None = None):
         }
         for r in rows
     ]
+
+
+@router.get("/tags")
+def map_tags():
+    try:
+        tags = get_tag_catalog()
+    except Exception:
+        tags = [{**item, "category": "Прочее"} for item in contract.TAG_CATALOG]
+    return {"tags": tags}

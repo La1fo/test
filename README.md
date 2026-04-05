@@ -125,11 +125,12 @@
    - `/achievements`
 4. Проверить auth, add-location и map:
    - `/login` поддерживает email и Telegram WebApp login
+   - `/api/session/me` возвращает состояние web-сессии (`authenticated`, `user_id`)
    - `/profile/me` требует сессию
    - `/add-location` рендерится
-   - `/api/add-location/form-config`, `/api/add-location/upload`, `/api/add-location/preview`, `/api/add-location/submit` доступны
+   - `/api/add-location/form-config`, `/api/add-location/upload`, `/api/add-location/preview`, `/api/add-location/submit` доступны и защищены cookie-сессией
    - при `DB_READ_ONLY=1` submit блокируется с понятной ошибкой
-   - `/map` показывает точки, поиск и фильтры по тегам, кнопку геопозиции
+   - `/map` показывает точки, поиск и фильтры по тегам, кнопку геопозиции и аккуратный control-panel UI
 
 ## Add-location flow
 В этом репозитории реализован полноценный web flow добавления локации:
@@ -140,6 +141,8 @@
   - `POST /api/add-location/upload`
   - `POST /api/add-location/preview`
   - `POST /api/add-location/submit`
+  - `GET /api/session/me` (состояние текущей web-сессии)
+  - `GET /api/map/locations` + `GET /api/map/tags` (поиск/фильтр карты)
 
 ### Что реализовано
 - Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
@@ -152,7 +155,9 @@
 - Каталог тегов берётся из БД (`tags`) и seed-ится полным каталогом.
 - Есть `/map` + `/api/map/locations` для просмотра approved locations.
 - На `/map` есть поиск по названию/описанию и фильтр по тегу.
+- Список тегов для карты грузится из БД (`tags`) через `GET /api/map/tags` и совпадает с add-location catalog.
 - Есть login/logout и session-cookie, `/add-location` и write API защищены.
+- `POST /api/session/email` и `POST /api/session/telegram` поддерживают `next` и устанавливают signed cookie `fm_session`.
 
 ### Runtime требования для submit
 - `DB_READ_ONLY=0`
@@ -160,6 +165,11 @@
 - `SECRET_KEY` задан (подпись session-cookie)
 - write-права к таблицам `users`, `locations`, `tags`, `location_tags`, `photos`
 - `MEDIA_ROOT` доступен на запись
+
+### Auth / session env vars
+- `SECRET_KEY` — обязателен для подписи web cookie-сессий.
+- `SESSION_TTL_SECONDS` — TTL cookie-сессии (по умолчанию 86400 секунд).
+- `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
 
 ### Media и миграции
 - На старте в write-режиме вызывается `ensure_add_location_schema()`:
