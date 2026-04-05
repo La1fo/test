@@ -21,7 +21,7 @@ def get_add_location_form_config() -> AddLocationFormConfigResponse:
     try:
         tag_catalog = get_tag_catalog()
     except Exception:
-        tag_catalog = [{**item, "category": "Прочее"} for item in contract.TAG_CATALOG]
+        tag_catalog = list(contract.TAG_CATALOG)
     return AddLocationFormConfigResponse(
         writer_integration_enabled=contract.INTEGRATION_ENABLED,
         max_tags=contract.MAX_TAGS,

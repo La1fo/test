@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from backend import main
 from backend import add_location_contract as contract
 from backend.api import add_location
+from backend.api import map as map_api
 from backend.schemas import AddLocationPreviewRequest, AddLocationSubmitRequest, PhotoMeta, PhotoUploadRequest
 from backend.session_auth import SESSION_COOKIE_NAME, create_session_cookie
 
@@ -63,6 +64,23 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         self.assertEqual(config.allowed_photo_mime, contract.ALLOWED_PHOTO_MIME)
         self.assertEqual(config.tag_catalog, contract.TAG_CATALOG)
         self.assertGreaterEqual(len(config.tag_catalog), 50)
+
+    def test_form_config_and_map_tags_use_same_db_source(self):
+        db_catalog = [
+            {"id": "cafe", "label": "кафе", "category": "Еда"},
+            {"id": "park", "label": "парк", "category": "Отдых"},
+        ]
+        old_add_catalog = add_location.get_tag_catalog
+        old_map_catalog = map_api.get_tag_catalog
+        add_location.get_tag_catalog = lambda: db_catalog
+        map_api.get_tag_catalog = lambda: db_catalog
+        try:
+            form_cfg = add_location.get_add_location_form_config()
+            map_tags = map_api.map_tags()
+            self.assertEqual(form_cfg.tag_catalog, map_tags["tags"])
+        finally:
+            add_location.get_tag_catalog = old_add_catalog
+            map_api.get_tag_catalog = old_map_catalog
 
     def test_preview_success(self):
         payload = AddLocationPreviewRequest(**self._valid_payload())

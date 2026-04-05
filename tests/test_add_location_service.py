@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import HTTPException
 
 from backend import add_location_service as service
+from backend import add_location_contract as contract
 from backend.schemas import AddLocationSubmitRequest
 
 
@@ -165,6 +166,14 @@ class TestAddLocationService(unittest.TestCase):
     def test_photo_resolver_supports_legacy_and_uploaded(self):
         self.assertEqual(service.resolve_photo_url("abc", "telegram", None), "/api/photos/telegram/abc")
         self.assertEqual(service.resolve_photo_url(None, "uploaded", "locations/1/a.jpg"), "/media/locations/1/a.jpg")
+
+    def test_contract_catalog_matches_bot_source_categories(self):
+        self.assertEqual(len(contract.TAG_CATALOG), sum(len(v) for v in contract.BOT_TAG_CATALOG.values()))
+        labels = {item["label"] for item in contract.TAG_CATALOG}
+        for category, category_labels in contract.BOT_TAG_CATALOG.items():
+            self.assertTrue(any(item["category"] == category for item in contract.TAG_CATALOG))
+            for label in category_labels:
+                self.assertIn(label, labels)
 
 
 if __name__ == "__main__":

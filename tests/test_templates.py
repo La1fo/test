@@ -109,17 +109,24 @@ class TestTemplates(unittest.TestCase):
         for token in ["1. Название", "2. Описание", "3. Координаты", "4. Теги", "5. Фото", "6. Preview"]:
             self.assertIn(token, page)
         self.assertIn('/static/add-location.js', page)
+        self.assertIn('id="pickerMap"', page)
+        self.assertIn('Определить мою геопозицию', page)
+        self.assertIn('type="hidden"', page)
+        self.assertNotIn('placeholder="Введите широту"', page)
+        self.assertNotIn('placeholder="Введите долготу"', page)
 
     def test_geolocation_hooks_present(self):
         add_js = Path("/workspace/test/frontend/add-location.js").read_text()
         map_page = self._read("map.html")
         self.assertIn("navigator.geolocation", add_js)
         self.assertIn("navigator.geolocation", map_page)
+        self.assertIn("selectedTagLabels", add_js)
 
     def test_map_page_uses_db_tag_catalog_api(self):
         map_page = self._read("map.html")
         self.assertIn("/api/map/tags", map_page)
         self.assertIn("loadMapTags", map_page)
+        self.assertIn("optgroup", map_page)
 
 
 if __name__ == "__main__":

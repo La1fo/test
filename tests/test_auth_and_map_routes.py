@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from fastapi import HTTPException
 
 from backend import main
+from backend import add_location_contract as contract
 from backend.api import map as map_api
 from backend.session_auth import SESSION_COOKIE_NAME, create_session_cookie
 
@@ -110,6 +111,16 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         try:
             payload = map_api.map_tags()
             self.assertEqual(payload["tags"][0]["id"], "ramp")
+        finally:
+            map_api.get_tag_catalog = old_catalog
+
+    def test_map_tags_endpoint_fallbacks_to_full_contract_catalog(self):
+        old_catalog = map_api.get_tag_catalog
+        map_api.get_tag_catalog = lambda: (_ for _ in ()).throw(RuntimeError("db down"))
+        try:
+            payload = map_api.map_tags()
+            self.assertEqual(len(payload["tags"]), len(contract.TAG_CATALOG))
+            self.assertEqual(payload["tags"][0]["category"], contract.TAG_CATALOG[0]["category"])
         finally:
             map_api.get_tag_catalog = old_catalog
 

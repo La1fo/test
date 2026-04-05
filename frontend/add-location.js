@@ -6,6 +6,7 @@
     maxTags: 5,
     maxPhotoSizeBytes: 10 * 1024 * 1024,
     submitMessage: '',
+    selectedPoint: null,
   };
 
   const tagList = document.getElementById('tagList');
@@ -66,9 +67,11 @@
   }
 
   function setCoordinates(lat, lng) {
+    state.selectedPoint = { lat, lng };
     document.getElementById('latitude').value = lat;
     document.getElementById('longitude').value = lng;
     coordinatesLabel.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    setStatus('Точка на карте выбрана. Можно продолжать заполнение.');
   }
 
   function initMapPicker() {
@@ -80,6 +83,7 @@
       else marker.setLatLng([lat, lng]);
       setCoordinates(lat, lng);
     });
+    setStatus('Выберите точку кликом по карте или кнопкой геолокации.');
   }
 
   function useMyLocation() {
@@ -180,6 +184,11 @@
     };
   }
 
+  function selectedTagLabels() {
+    const byId = new Map(state.tagCatalog.map((tag) => [tag.id, tag.label]));
+    return Array.from(state.tags).map((id) => byId.get(id) || id);
+  }
+
   function validateClient(payload) {
     if (!payload.name?.trim()) return 'Введите название';
     if (!payload.description?.trim()) return 'Введите описание';
@@ -192,7 +201,7 @@
   }
 
   function renderPreview(normalized) {
-    const tags = normalized.tag_ids.length ? normalized.tag_ids.join(', ') : 'Не выбраны';
+    const tags = selectedTagLabels().length ? selectedTagLabels().join(', ') : 'Не выбраны';
     const photos = normalized.photos
       .map((photo) => `<li>${photo.filename} (${Math.round(photo.size_bytes / 1024)} KB)</li>`)
       .join('');

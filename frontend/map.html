@@ -53,12 +53,23 @@
       const select = document.getElementById('tagFilter');
       const current = select.value;
       select.innerHTML = '<option value="">Все теги</option>';
+      const grouped = {};
       tags.forEach((tag) => {
-        const option = document.createElement('option');
-        option.value = tag.id;
-        option.textContent = tag.label;
-        if (current && (current === tag.id || current === tag.label)) option.selected = true;
-        select.appendChild(option);
+        const category = tag.category || 'Прочее';
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(tag);
+      });
+      Object.keys(grouped).sort().forEach((category) => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = category;
+        grouped[category].forEach((tag) => {
+          const option = document.createElement('option');
+          option.value = tag.id;
+          option.textContent = tag.label;
+          if (current && (current === tag.id || current === tag.label)) option.selected = true;
+          optgroup.appendChild(option);
+        });
+        select.appendChild(optgroup);
       });
     }
 

@@ -58,5 +58,5 @@ def map_tags():
     try:
         tags = get_tag_catalog()
     except Exception:
-        tags = [{**item, "category": "Прочее"} for item in contract.TAG_CATALOG]
+        tags = list(contract.TAG_CATALOG)
     return {"tags": tags}

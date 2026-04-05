@@ -146,16 +146,18 @@
 
 ### Что реализовано
 - Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
-- Выбор координат через карту (Leaflet) с маркером.
+- Выбор координат через карту (Leaflet) с marker selection как основной UX (ручной ввод скрыт как fallback).
 - На add-location и /map есть кнопка определения геопозиции пользователя.
 - Client-side + server-side валидация обязательных полей.
 - Реальная запись pending-локации в write-режиме (`DB_READ_ONLY=0`).
 - Атомарный submit path с idempotency key.
 - Upload и хранение web-фото в `MEDIA_ROOT` + обратная совместимость legacy `file_id`.
 - Каталог тегов берётся из БД (`tags`) и seed-ится полным каталогом.
+- Полный bot tag catalog синхронизируется idempotent-миграцией в `tags` (slug/code/name/category).
 - Есть `/map` + `/api/map/locations` для просмотра approved locations.
 - На `/map` есть поиск по названию/описанию и фильтр по тегу.
-- Список тегов для карты грузится из БД (`tags`) через `GET /api/map/tags` и совпадает с add-location catalog.
+- Список тегов для карты грузится из БД (`tags`) через `GET /api/map/tags` и совпадает с add-location catalog (`/api/add-location/form-config`).
+- Категории тегов отображаются и в add-location (чипы), и в map filter (grouped select).
 - Есть login/logout и session-cookie, `/add-location` и write API защищены.
 - `POST /api/session/email` и `POST /api/session/telegram` поддерживают `next` и устанавливают signed cookie `fm_session`.
 
@@ -175,4 +177,5 @@
 - На старте в write-режиме вызывается `ensure_add_location_schema()`:
   - добавляются дополнительные колонки в `photos` (если отсутствуют),
   - создаётся `site_submission_idempotency`,
-  - создаётся/синхронизируется таблица `tags` (slug/code/name/category).
+  - создаётся/синхронизируется таблица `tags` (slug/code/name/category),
+  - выполняется idempotent upsert полного bot tag catalog.
