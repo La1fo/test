@@ -8,8 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
-from .add_location_service import validate_telegram_init_data
-from .api.auth import ensure_telegram_user, login_email, register_email_account
+from .api.auth import login_email, register_email_account
 from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_add_location_schema, ensure_auth_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
@@ -80,7 +79,7 @@ class ProfileRow:
     gp_display: str
 
 
-def _writer_rank_name(total_gp: int, position: int | None = None) -> str:
+def _site_rank_name(total_gp: int, position: int | None = None) -> str:
     if total_gp >= 1300 and position is not None and position <= 10:
         return MASTER_CARTOGRAPHER_RANK_NAME
     if total_gp >= 900:
@@ -94,7 +93,7 @@ def _display_rank_name(rank_name: str | None, total_gp: int, position: int | Non
     normalized = (rank_name or "").strip()
     if normalized in KNOWN_RANK_NAMES:
         return normalized
-    return _writer_rank_name(total_gp, position)
+    return _site_rank_name(total_gp, position)
 
 
 def _format_gp_display(total_gp: int, gp_in_rank: int, rank_name: str) -> str:
@@ -253,8 +252,7 @@ def get_context(request: Request):
     current_path = getattr(getattr(request, "url", None), "path", "")
     return {
         "request": request,
-        "bot_username": os.getenv("TELEGRAM_BOT_USERNAME", "FrendlyMapBot"),
-        "current_user_id": current_user_id,
+                "current_user_id": current_user_id,
         "is_authenticated": current_user_id is not None,
         "current_path": current_path,
     }
@@ -317,20 +315,6 @@ async def register_email_page(
     _set_session_cookie(response, int(user_id))
     return response
 
-
-@app.post("/api/session/telegram")
-async def login_telegram_page(request: Request, init_data: str = Body(...), next: str = Body("/")):
-    _ = request
-    identity = validate_telegram_init_data(init_data)
-    user_id = ensure_telegram_user(
-        telegram_id=int(identity.telegram_id),
-        username=identity.username,
-        first_name=identity.first_name,
-        last_name=identity.last_name,
-    )
-    response = RedirectResponse(url=_normalize_next(next), status_code=303)
-    _set_session_cookie(response, int(user_id))
-    return response
 
 
 @app.get("/logout")

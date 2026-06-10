@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Request
 
 from .. import add_location_contract as contract
 from ..add_location_service import get_tag_catalog, save_temp_uploads, submit_location
@@ -55,10 +55,9 @@ def upload_photos(payload: PhotoUploadRequest, request: Request) -> list[PhotoMe
 def submit(
     payload: AddLocationSubmitRequest,
     request: Request,
-    x_telegram_init_data: str = Header(default="", alias="X-Telegram-Init-Data"),
 ) -> AddLocationSubmitResponse:
     user_id = get_current_user_id(request, required=True)
-    result = submit_location(payload=payload, init_data=x_telegram_init_data, session_user_id=user_id)
+    result = submit_location(payload=payload, session_user_id=user_id)
     return AddLocationSubmitResponse(
         accepted=True,
         location_id=result.location_id,

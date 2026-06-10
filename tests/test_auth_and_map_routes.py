@@ -119,27 +119,10 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         finally:
             main.DB_READ_ONLY = old_ro
 
-    def test_telegram_login_success(self):
-        old_validate = main.validate_telegram_init_data
-        old_ensure = main.ensure_telegram_user
-        main.validate_telegram_init_data = lambda init_data: SimpleNamespace(telegram_id=99, username="tg", first_name=None, last_name=None)
-        main.ensure_telegram_user = lambda **kwargs: 199
-        try:
-            response = asyncio.run(main.login_telegram_page(SimpleNamespace(), init_data='ok', next='/'))
-            self.assertEqual(response.status_code, 303)
-            self.assertIn('set-cookie', response.headers)
-        finally:
-            main.validate_telegram_init_data = old_validate
-            main.ensure_telegram_user = old_ensure
 
-    def test_telegram_login_failure(self):
-        old_validate = main.validate_telegram_init_data
-        main.validate_telegram_init_data = lambda init_data: (_ for _ in ()).throw(HTTPException(status_code=403, detail='bad'))
-        try:
-            with self.assertRaises(HTTPException):
-                asyncio.run(main.login_telegram_page(SimpleNamespace(), init_data='bad', next='/'))
-        finally:
-            main.validate_telegram_init_data = old_validate
+    def test_standalone_site_has_no_telegram_session_route(self):
+        paths = {route.path for route in main.app.routes}
+        self.assertNotIn("/api/session/telegram", paths)
 
     def test_map_route_renders(self):
         req = SimpleNamespace(cookies={})
@@ -166,7 +149,7 @@ class TestAuthAndMapRoutes(unittest.TestCase):
                 _ = q
                 self.params = params
             def fetchall(self):
-                return [(1, 'A', 'D', 1.0, 2.0, 'legacy-id', 'telegram', None, 'tag1, tag2')]
+                return [(1, 'A', 'D', 1.0, 2.0, 'legacy-id', 'legacy', None, 'tag1, tag2')]
             def __enter__(self): return self
             def __exit__(self, a,b,c): return False
         class Conn:

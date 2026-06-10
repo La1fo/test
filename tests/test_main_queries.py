@@ -86,7 +86,7 @@ class TestMainQueries(unittest.TestCase):
             restore()
 
 
-    def test_leaderboard_keeps_writer_rank_name_from_view(self):
+    def test_leaderboard_keeps_site_rank_name_from_view(self):
         rows = [(10, "mira", 1450, 11, 400, "⭐ Мастер-картограф", 3)]
         cursor = FakeCursor(rows)
         restore = self._patch_connection(cursor)
@@ -98,7 +98,7 @@ class TestMainQueries(unittest.TestCase):
         finally:
             restore()
 
-    def test_profile_keeps_writer_rank_name_from_view(self):
+    def test_profile_keeps_site_rank_name_from_view(self):
         rows = [(11, "terra", 1300, 11, 400, "⭐ Мастер-картограф", 12)]
         cursor = FakeCursor(rows)
         restore = self._patch_connection(cursor)
@@ -165,9 +165,9 @@ class TestMainQueries(unittest.TestCase):
             restore()
 
     def test_master_cartographer_only_for_top_10(self):
-        self.assertEqual(main._writer_rank_name(1300, 5), "⭐ Мастер-картограф")
-        self.assertEqual(main._writer_rank_name(1300, 11), "🟣 Картограф")
-        self.assertEqual(main._writer_rank_name(1500, None), "🟣 Картограф")
+        self.assertEqual(main._site_rank_name(1300, 5), "⭐ Мастер-картограф")
+        self.assertEqual(main._site_rank_name(1300, 11), "🟣 Картограф")
+        self.assertEqual(main._site_rank_name(1500, None), "🟣 Картограф")
         self.assertEqual(main._format_gp_display(1300, 400, "⭐ Мастер-картограф"), "400")
         self.assertEqual(main._format_gp_display(1500, 600, "⭐ Мастер-картограф"), "600")
         self.assertEqual(main._format_gp_display(102, 2, "🟢 Исследователь 2"), "2")

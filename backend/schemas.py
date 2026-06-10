@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field, field_validator
 
 from . import add_location_contract as contract
@@ -17,16 +15,6 @@ class UserCreate(BaseModel):
         if "@" not in value or value.startswith("@") or value.endswith("@"):
             raise ValueError("Invalid email format")
         return value
-
-
-class TelegramAuthPayload(BaseModel):
-    id: int
-    auth_date: int
-    hash: str
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    username: Optional[str] = None
-    photo_url: Optional[str] = None
 
 
 class Token(BaseModel):

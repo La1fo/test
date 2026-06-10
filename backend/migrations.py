@@ -14,7 +14,7 @@ def ensure_add_location_schema() -> None:
             cur.execute(
                 """
                 ALTER TABLE IF EXISTS photos
-                ADD COLUMN IF NOT EXISTS storage_type TEXT DEFAULT 'telegram',
+                ADD COLUMN IF NOT EXISTS storage_type TEXT DEFAULT 'legacy',
                 ADD COLUMN IF NOT EXISTS storage_path TEXT,
                 ADD COLUMN IF NOT EXISTS mime_type TEXT,
                 ADD COLUMN IF NOT EXISTS original_name TEXT,
@@ -26,11 +26,19 @@ def ensure_add_location_schema() -> None:
                 CREATE TABLE IF NOT EXISTS site_submission_idempotency (
                   id BIGSERIAL PRIMARY KEY,
                   idempotency_key TEXT NOT NULL,
-                  telegram_id BIGINT NOT NULL,
+                  user_id BIGINT NOT NULL,
                   location_id BIGINT,
                   created_at TIMESTAMPTZ DEFAULT NOW(),
-                  UNIQUE (idempotency_key, telegram_id)
+                  UNIQUE (idempotency_key, user_id)
                 )
+                """
+            )
+            cur.execute("ALTER TABLE site_submission_idempotency ADD COLUMN IF NOT EXISTS user_id BIGINT")
+            cur.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_site_submission_idempotency_key_user
+                ON site_submission_idempotency (idempotency_key, user_id)
+                WHERE user_id IS NOT NULL
                 """
             )
             cur.execute(
@@ -82,13 +90,6 @@ def ensure_auth_schema() -> None:
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email_lower_unique
                 ON users (LOWER(email))
                 WHERE email IS NOT NULL
-                """
-            )
-            cur.execute(
-                """
-                CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telegram_id_unique
-                ON users (telegram_id)
-                WHERE telegram_id IS NOT NULL
                 """
             )
             cur.execute(

@@ -12,7 +12,7 @@
   <main class="page-shell">
     <section class="surface-card" style="max-width:560px;">
       <h1 class="page-title">Вход</h1>
-      <p class="muted-text">Авторизуйтесь через email или Telegram.</p>
+      <p class="muted-text">Авторизуйтесь или создайте аккаунт на сайте.</p>
       <div class="field"><input id="email" type="email" placeholder="Email"></div>
       <div class="field"><input id="password" type="password" placeholder="Пароль"></div>
       <button class="btn-primary" id="emailLoginBtn" type="button">Войти по email</button>
@@ -26,10 +26,6 @@
       <div class="field"><input id="regPasswordConfirm" type="password" placeholder="Подтвердите пароль"></div>
       <button class="btn-primary" id="registerBtn" type="button">Зарегистрироваться</button>
 
-      <hr style="margin:16px 0;">
-
-      <button class="btn-primary" id="tgLoginBtn" type="button">Войти через Telegram WebApp</button>
-      <p class="muted-text">Откройте сайт внутри Telegram для автоматической передачи init_data.</p>
       <div id="status" class="status"></div>
     </section>
   </main>
@@ -49,19 +45,6 @@
       else status.textContent = (await res.json()).detail || 'Ошибка входа';
     }
 
-    async function loginViaTelegram() {
-      const init_data = window.Telegram?.WebApp?.initData || '';
-      if (!init_data) {
-        status.textContent = 'Telegram init_data не найден. Откройте страницу внутри Telegram WebApp.';
-        return;
-      }
-      const res = await fetch('/api/session/telegram', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({init_data, next}),
-      });
-      if (res.ok) window.location.href = next;
-      else status.textContent = (await res.json()).detail || 'Ошибка входа';
-    }
 
     async function registerViaEmail() {
       const username = document.getElementById('regUsername').value.trim();
@@ -78,12 +61,6 @@
 
     document.getElementById('emailLoginBtn').addEventListener('click', loginViaEmail);
     document.getElementById('registerBtn').addEventListener('click', registerViaEmail);
-    document.getElementById('tgLoginBtn').addEventListener('click', loginViaTelegram);
-
-    // Авто-bootstrap web-сессии, если страница открыта внутри Telegram WebApp.
-    if (window.Telegram?.WebApp?.initData) {
-      loginViaTelegram();
-    }
   </script>
   <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>

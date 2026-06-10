@@ -16,7 +16,7 @@ def _safe_db_url(db_url: str) -> str:
 
 def main() -> int:
     try:
-        from .database import BOT_DB_URL, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
+        from .database import DATABASE_DSN, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
         print(f"Причина: {exc}")
@@ -25,7 +25,7 @@ def main() -> int:
         return 1
 
     contract = get_db_contract()
-    print(f"Используем БД: {_safe_db_url(BOT_DB_URL)}")
+    print(f"Используем БД: {_safe_db_url(DATABASE_DSN)}")
     print(f"Режим БД: {'read-only' if DB_READ_ONLY else 'read-write'}")
     print(f"Schema mode: {'legacy-compat' if LEGACY_SCHEMA_COMPAT else 'strict-contract'}")
     print(f"Legacy compatibility: {'on' if LEGACY_SCHEMA_COMPAT else 'off'}")

@@ -27,9 +27,6 @@
     statusBox.classList.toggle('error', isError);
   }
 
-  function getInitData() {
-    return window.Telegram?.WebApp?.initData || '';
-  }
 
   async function loadConfig() {
     const res = await fetch('/api/add-location/form-config');
@@ -262,7 +259,6 @@
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Telegram-Init-Data': getInitData(),
       },
       body: JSON.stringify(submitPayload),
     });

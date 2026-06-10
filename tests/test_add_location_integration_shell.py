@@ -123,7 +123,7 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         add_location.submit_location = lambda **kwargs: SimpleNamespace(location_id=77, status="pending", duplicate=False)
         try:
             request = SimpleNamespace(cookies={SESSION_COOKIE_NAME: create_session_cookie(1)})
-            response = add_location.submit(payload, request=request, x_telegram_init_data="signed-init-data")
+            response = add_location.submit(payload, request=request)
             self.assertTrue(response.accepted)
             self.assertEqual(response.location_id, 77)
             self.assertEqual(response.status, "pending")
@@ -134,7 +134,7 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
     def test_submit_without_auth_is_forbidden(self):
         payload = AddLocationSubmitRequest(**{**self._valid_payload(), "idempotency_key": "test-key-12345"})
         with self.assertRaises(HTTPException):
-            add_location.submit(payload, request=SimpleNamespace(cookies={}), x_telegram_init_data="")
+            add_location.submit(payload, request=SimpleNamespace(cookies={}))
 
     def test_preview_without_auth_is_forbidden(self):
         payload = AddLocationPreviewRequest(**self._valid_payload())
@@ -170,8 +170,6 @@ class TestAddLocationIntegrationShell(unittest.TestCase):
         self.assertIn("/profile/{user_id}", runtime_section)
         self.assertIn("/achievements", runtime_section)
         self.assertIn("/add-location", runtime_section)
-        self.assertNotIn("/auth/telegram", runtime_section)
-        self.assertNotIn("/auth/email/login", runtime_section)
 
     def test_preview_template_is_human_readable_not_raw_json_dump(self):
         page = Path("/workspace/test/frontend/add-location.html").read_text()

@@ -1,1 +1,1 @@
-# API package for reader-service routes.
+# API package for FriendlyMap website routes.

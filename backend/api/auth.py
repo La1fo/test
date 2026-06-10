@@ -1,14 +1,11 @@
-import os
-
 from fastapi import APIRouter, Body, HTTPException
 
 from ..database import DB_READ_ONLY, get_connection, get_db_contract
-from ..schemas import TelegramAuthPayload, UserCreate
-from ..security import create_access_token, get_password_hash, verify_password, verify_telegram_auth
+from ..schemas import UserCreate
+from ..security import create_access_token, get_password_hash, verify_password
 
 router = APIRouter()
 
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
 
 def _normalize_email(email: str) -> str:
@@ -25,37 +22,6 @@ def _users_columns(cur) -> set[str]:
     )
     return {row[0] for row in cur.fetchall()}
 
-
-def _insert_user(cur, username: str, telegram_id: int | None = None) -> int:
-    cols = _users_columns(cur)
-    if "username" not in cols:
-        raise HTTPException(status_code=500, detail="users.username column is required")
-
-    fields = ["username"]
-    values: list[object] = [username]
-
-    if "telegram_id" in cols:
-        fields.append("telegram_id")
-        values.append(telegram_id)
-    if "first_name" in cols:
-        fields.append("first_name")
-        values.append(username[:64])
-    if "last_name" in cols:
-        fields.append("last_name")
-        values.append(None)
-    if "moderation_locations" in cols:
-        fields.append("moderation_locations")
-        values.append(0)
-    if "total_gp" in cols:
-        fields.append("total_gp")
-        values.append(0)
-
-    placeholders = ", ".join(["%s"] * len(values))
-    cur.execute(
-        f"INSERT INTO users ({', '.join(fields)}) VALUES ({placeholders}) RETURNING id",
-        tuple(values),
-    )
-    return int(cur.fetchone()[0])
 
 
 def _find_user_by_email(cur, email: str):
@@ -108,7 +74,6 @@ def register_email_account(*, username: str, email: str, password: str) -> int:
                     "notify_points": True,
                     "language": "ru",
                     "theme": "light",
-                    "telegram_id": None,
                 }
                 fields = ["username"]
                 values: list[object] = [username.strip()]
@@ -129,98 +94,6 @@ def register_email_account(*, username: str, email: str, password: str) -> int:
             raise
 
 
-def ensure_telegram_user(*, telegram_id: int, username: str | None, first_name: str | None, last_name: str | None) -> int:
-    display_username = (username or first_name or f"user_{telegram_id}").strip()
-    with get_connection() as conn:
-        try:
-            with conn.cursor() as cur:
-                cur.execute("SELECT id FROM users WHERE telegram_id = %s LIMIT 1", (telegram_id,))
-                row = cur.fetchone()
-                if row:
-                    user_id = int(row[0])
-                    if DB_READ_ONLY:
-                        return user_id
-                else:
-                    if DB_READ_ONLY:
-                        raise HTTPException(status_code=503, detail="Telegram bootstrap disabled in read-only DB mode")
-                    cols = _users_columns(cur)
-                    fields = ["username"]
-                    values: list[object] = [display_username]
-                    if "telegram_id" in cols:
-                        fields.append("telegram_id")
-                        values.append(telegram_id)
-                    if "email_verified" in cols:
-                        fields.append("email_verified")
-                        values.append(False)
-                    if "total_gp" in cols:
-                        fields.append("total_gp")
-                        values.append(0)
-                    if "moderation_locations" in cols:
-                        fields.append("moderation_locations")
-                        values.append(0)
-                    if "show_name_on_map" in cols:
-                        fields.append("show_name_on_map")
-                        values.append(True)
-                    if "notify_points" in cols:
-                        fields.append("notify_points")
-                        values.append(True)
-                    if "language" in cols:
-                        fields.append("language")
-                        values.append("ru")
-                    if "theme" in cols:
-                        fields.append("theme")
-                        values.append("light")
-                    placeholders = ", ".join(["%s"] * len(values))
-                    cur.execute(
-                        f"INSERT INTO users ({', '.join(fields)}) VALUES ({placeholders}) RETURNING id",
-                        tuple(values),
-                    )
-                    user_id = int(cur.fetchone()[0])
-                if not DB_READ_ONLY:
-                    cur.execute(
-                        """
-                        UPDATE users
-                        SET username = COALESCE(NULLIF(%s, ''), username),
-                            first_name = COALESCE(%s, first_name),
-                            last_name = COALESCE(%s, last_name)
-                        WHERE id = %s
-                        """,
-                        (display_username, first_name, last_name, user_id),
-                    )
-            conn.commit()
-            return user_id
-        except Exception:
-            conn.rollback()
-            raise
-
-
-@router.post("/telegram")
-def login_telegram(payload: TelegramAuthPayload):
-    data = payload.model_dump(exclude_none=True)
-
-    if not verify_telegram_auth(data, TELEGRAM_BOT_TOKEN):
-        raise HTTPException(status_code=400, detail="Invalid Telegram auth")
-
-    telegram_id = int(data["id"])
-    users_view = get_db_contract().auth_users_view
-
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"SELECT user_id FROM {users_view} WHERE telegram_id = %s",
-                (telegram_id,),
-            )
-            row = cur.fetchone()
-
-    if row is None:
-        raise HTTPException(
-            status_code=403,
-            detail="User does not exist in shared FriendlyMap DB. Registration is handled by writer services.",
-        )
-
-    user_id = row[0]
-    access_token = create_access_token(data={"sub": str(user_id)})
-    return {"access_token": access_token, "token_type": "bearer", "user_id": user_id}
 
 
 @router.post("/email/register")

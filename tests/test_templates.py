@@ -20,7 +20,7 @@ class TestTemplates(unittest.TestCase):
 
     def test_home_has_email_pill_and_new_hero(self):
         home = self._read("index.html")
-        self.assertIn("friendlymapbot@gmail.com", home)
+        self.assertIn("friendlymap@example.com", home)
         self.assertIn("email-pill", home)
         self.assertNotIn("Планы", home)
         self.assertNotIn("доступных мест и получай награды", home)
@@ -47,6 +47,8 @@ class TestTemplates(unittest.TestCase):
         self.assertIn("Регистрация", login)
         self.assertIn("regUsername", login)
         self.assertIn("/api/session/register", login)
+        self.assertNotIn("Telegram", login)
+        self.assertNotIn("/api/session/telegram", login)
 
     def test_logout_available_on_profile_page_only(self):
         profile = self._read("profile.html")

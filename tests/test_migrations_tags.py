@@ -38,7 +38,7 @@ class RecorderConn:
 
 
 class TestMigrationsTagCatalog(unittest.TestCase):
-    def test_ensure_add_location_schema_seeds_full_bot_catalog(self):
+    def test_ensure_add_location_schema_seeds_full_site_catalog(self):
         cursor = RecorderCursor()
 
         @contextmanager
@@ -57,10 +57,10 @@ class TestMigrationsTagCatalog(unittest.TestCase):
         self.assertEqual(len(tag_upserts), len(contract.TAG_CATALOG))
 
         seeded_categories = {params[3] for _, params in tag_upserts}
-        self.assertEqual(seeded_categories, set(contract.BOT_TAG_CATALOG.keys()))
+        self.assertEqual(seeded_categories, set(contract.TAG_CATEGORIES.keys()))
 
         seeded_labels = {params[2] for _, params in tag_upserts}
-        for labels in contract.BOT_TAG_CATALOG.values():
+        for labels in contract.TAG_CATEGORIES.values():
             for label in labels:
                 self.assertIn(label, seeded_labels)
 

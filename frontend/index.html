@@ -92,7 +92,7 @@
       line-height: 1.4;
     }
 
-    .btn-telegram {
+    .btn-primary-home {
       width: 100%;
       max-width: 340px;
       padding: 16px 24px;
@@ -108,7 +108,7 @@
       transition: all 0.25s ease;
     }
 
-    .btn-telegram:hover {
+    .btn-primary-home:hover {
       background: #1a7bd8;
       transform: translateY(-2px);
       box-shadow: 0 12px 28px rgba(41, 151, 245, 0.55);
@@ -153,17 +153,11 @@
       <div class="hero-logo-text">Frendly Map</div>
     </div>
     <div class="hero-slogan">Добавляй метки и повышайте ранг</div>
-    <button id="botLink" class="btn-telegram">Начать в Telegram</button>
+    <a href="/add-location" class="btn-primary-home">Добавить локацию</a>
   </div>
 
-  <div class="email-pill">Почта: <a href="mailto:friendlymapbot@gmail.com">friendlymapbot@gmail.com</a></div>
+  <div class="email-pill">Почта: <a href="mailto:friendlymap@example.com">friendlymap@example.com</a></div>
 
-  <script>
-    document.getElementById("botLink").addEventListener("click", (e) => {
-      e.preventDefault();
-      window.open("https://t.me/Friendly_MapBot", '_blank');
-    });
-  </script>
   <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
 </body>

@@ -1,6 +1,3 @@
-import hashlib
-import hmac
-import json
 import os
 import re
 import shutil
@@ -9,7 +6,6 @@ import base64
 import binascii
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import parse_qsl
 
 from fastapi import HTTPException
 
@@ -17,7 +13,6 @@ from . import add_location_contract as contract
 from .database import DB_READ_ONLY, get_connection
 from .schemas import AddLocationSubmitRequest, PhotoMeta, PhotoUploadItem
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 MEDIA_ROOT = Path(os.getenv("MEDIA_ROOT", "/workspace/test/media")).resolve()
 MAX_BYTES = contract.MAX_PHOTO_SIZE_BYTES
 SAFE_TEMP_ID = re.compile(r"^[a-f0-9\-]{8,64}$")
@@ -30,52 +25,9 @@ class SubmitResult:
     duplicate: bool
 
 
-@dataclass
-class TelegramIdentity:
-    telegram_id: int
-    username: str | None
-    first_name: str | None
-    last_name: str | None
-
-
 def _ensure_write_allowed() -> None:
     if DB_READ_ONLY:
-        raise HTTPException(status_code=503, detail="Add-location submit disabled in read-only DB mode")
-
-
-def validate_telegram_init_data(init_data: str) -> TelegramIdentity:
-    if not init_data:
-        raise HTTPException(status_code=401, detail="Telegram init_data is required")
-    if not BOT_TOKEN:
-        raise HTTPException(status_code=500, detail="TELEGRAM_BOT_TOKEN is not configured")
-
-    pairs = parse_qsl(init_data, keep_blank_values=True)
-    data = dict(pairs)
-    provided_hash = data.pop("hash", None)
-    if not provided_hash:
-        raise HTTPException(status_code=401, detail="Missing hash in init_data")
-
-    check_string = "\n".join(f"{k}={v}" for k, v in sorted(data.items()))
-    secret = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    computed_hash = hmac.new(secret, check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(computed_hash, provided_hash):
-        raise HTTPException(status_code=403, detail="Invalid Telegram init_data")
-
-    user_raw = data.get("user")
-    if not user_raw:
-        raise HTTPException(status_code=401, detail="Missing user in init_data")
-
-    try:
-        user = json.loads(user_raw)
-    except json.JSONDecodeError as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid Telegram user payload: {exc}") from exc
-
-    return TelegramIdentity(
-        telegram_id=int(user["id"]),
-        username=user.get("username"),
-        first_name=user.get("first_name"),
-        last_name=user.get("last_name"),
-    )
+        raise HTTPException(status_code=503, detail="Write operations are disabled in read-only DB mode")
 
 
 def _safe_filename(name: str) -> str:
@@ -142,30 +94,22 @@ def _ensure_idempotency_table(cur) -> None:
         CREATE TABLE IF NOT EXISTS site_submission_idempotency (
           id BIGSERIAL PRIMARY KEY,
           idempotency_key TEXT NOT NULL,
-          telegram_id BIGINT NOT NULL,
+          user_id BIGINT NOT NULL,
           location_id BIGINT,
           created_at TIMESTAMPTZ DEFAULT NOW(),
-          UNIQUE (idempotency_key, telegram_id)
+          UNIQUE (idempotency_key, user_id)
         )
         """
     )
-
-
-def _upsert_user(cur, identity: TelegramIdentity) -> int:
+    cur.execute("ALTER TABLE site_submission_idempotency ADD COLUMN IF NOT EXISTS user_id BIGINT")
     cur.execute(
         """
-        INSERT INTO users (id, telegram_id, username, first_name, last_name, moderation_locations)
-        VALUES (%s, %s, %s, %s, %s, 0)
-        ON CONFLICT (telegram_id)
-        DO UPDATE SET
-          username = EXCLUDED.username,
-          first_name = EXCLUDED.first_name,
-          last_name = EXCLUDED.last_name
-        RETURNING id
-        """,
-        (identity.telegram_id, identity.telegram_id, identity.username, identity.first_name, identity.last_name),
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_site_submission_idempotency_key_user
+        ON site_submission_idempotency (idempotency_key, user_id)
+        WHERE user_id IS NOT NULL
+        """
     )
-    return int(cur.fetchone()[0])
+
 
 
 def _resolve_user_by_id(cur, user_id: int) -> int:
@@ -251,10 +195,11 @@ def _store_location_photo(cur, location_id: int, photo: PhotoMeta, order_index: 
     return str(dest)
 
 
-def submit_location(payload: AddLocationSubmitRequest, init_data: str = "", session_user_id: int | None = None) -> SubmitResult:
+def submit_location(payload: AddLocationSubmitRequest, session_user_id: int | None = None) -> SubmitResult:
     _ensure_write_allowed()
-    identity = validate_telegram_init_data(init_data) if session_user_id is None else None
-    telegram_id_for_idempotency = identity.telegram_id if identity else int(session_user_id)
+    if session_user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    idempotency_user_id = int(session_user_id)
 
     moved_files: list[str] = []
     with get_connection() as conn:
@@ -262,15 +207,15 @@ def submit_location(payload: AddLocationSubmitRequest, init_data: str = "", sess
             with conn.cursor() as cur:
                 _ensure_idempotency_table(cur)
                 cur.execute(
-                    "SELECT location_id FROM site_submission_idempotency WHERE idempotency_key = %s AND telegram_id = %s",
-                    (payload.idempotency_key, telegram_id_for_idempotency),
+                    "SELECT location_id FROM site_submission_idempotency WHERE idempotency_key = %s AND user_id = %s",
+                    (payload.idempotency_key, idempotency_user_id),
                 )
                 row = cur.fetchone()
                 if row and row[0]:
                     conn.commit()
                     return SubmitResult(location_id=int(row[0]), status="pending", duplicate=True)
 
-                user_id = _upsert_user(cur, identity) if identity else _resolve_user_by_id(cur, int(session_user_id))
+                user_id = _resolve_user_by_id(cur, idempotency_user_id)
                 db_tag_ids = _resolve_db_tags(cur, payload.tag_ids)
                 location_id = _pending_location(cur, user_id, payload)
                 _insert_location_tags(cur, location_id, db_tag_ids)
@@ -280,12 +225,12 @@ def submit_location(payload: AddLocationSubmitRequest, init_data: str = "", sess
 
                 cur.execute(
                     """
-                    INSERT INTO site_submission_idempotency (idempotency_key, telegram_id, location_id)
+                    INSERT INTO site_submission_idempotency (idempotency_key, user_id, location_id)
                     VALUES (%s, %s, %s)
-                    ON CONFLICT (idempotency_key, telegram_id)
+                    ON CONFLICT (idempotency_key, user_id)
                     DO UPDATE SET location_id = EXCLUDED.location_id
                     """,
-                    (payload.idempotency_key, telegram_id_for_idempotency, location_id),
+                    (payload.idempotency_key, idempotency_user_id, location_id),
                 )
 
             conn.commit()
@@ -303,7 +248,7 @@ def resolve_photo_url(file_id: str | None, storage_type: str | None, storage_pat
     if storage_type == "uploaded" and storage_path:
         return f"/media/{storage_path}"
     if file_id:
-        return f"/api/photos/telegram/{file_id}"
+        return f"/api/photos/{file_id}"
     return None
 
 

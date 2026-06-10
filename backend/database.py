@@ -49,7 +49,7 @@ def _build_postgres_dsn() -> str:
     return f"postgresql://{user}:{password}@{host}:{port}/{database}"
 
 
-BOT_DB_URL = _build_postgres_dsn()
+DATABASE_DSN = _build_postgres_dsn()
 DB_READ_ONLY = _bool_env("DB_READ_ONLY", True)
 LEGACY_SCHEMA_COMPAT = _bool_env("LEGACY_SCHEMA_COMPAT", False)
 
@@ -96,7 +96,7 @@ def get_connection(dict_cursor: bool = False):
         extras = importlib.import_module("psycopg2.extras")
         connect_kwargs["cursor_factory"] = extras.RealDictCursor
 
-    conn = driver.connect(BOT_DB_URL, **connect_kwargs)
+    conn = driver.connect(DATABASE_DSN, **connect_kwargs)
     try:
         yield conn
     finally:

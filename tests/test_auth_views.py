@@ -5,7 +5,6 @@ from fastapi import HTTPException
 
 from backend.api import auth
 from backend.database import DBContract
-from backend.schemas import TelegramAuthPayload
 
 
 class FakeCursor:
@@ -60,19 +59,16 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
 
         old_contract = auth.get_db_contract
         old_conn = auth.get_connection
-        old_verify_tg = auth.verify_telegram_auth
         old_verify_password = auth.verify_password
         old_create_token = auth.create_access_token
         auth.get_db_contract = lambda: self.contract
         auth.get_connection = fake_conn
-        auth.verify_telegram_auth = lambda data, token: True
         auth.verify_password = lambda plain, hashed: True
         auth.create_access_token = lambda data: "token"
 
         def restore():
             auth.get_db_contract = old_contract
             auth.get_connection = old_conn
-            auth.verify_telegram_auth = old_verify_tg
             auth.verify_password = old_verify_password
             auth.create_access_token = old_create_token
 
@@ -232,68 +228,7 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
             auth.get_db_contract = old_contract
             auth.create_access_token = old_create_token
 
-    def test_ensure_telegram_user_creates_user_when_missing(self):
-        calls = []
 
-        class Cursor:
-            def __init__(self):
-                self._last_query = ""
-
-            def execute(self, query, params=None):
-                self._last_query = " ".join(query.split()).lower()
-                calls.append(self._last_query)
-
-            def fetchone(self):
-                if "select id from users where telegram_id" in self._last_query:
-                    return None
-                if "returning id" in self._last_query and "insert into users" in self._last_query:
-                    return (333,)
-                return None
-
-            def fetchall(self):
-                if "information_schema.columns" in self._last_query:
-                    return [("id",), ("username",), ("telegram_id",), ("moderation_locations",)]
-                return []
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, exc_type, exc, tb):
-                return False
-
-        conn = FakeConnection(Cursor())
-        conn.commit = lambda: None
-        conn.rollback = lambda: None
-
-        @contextmanager
-        def fake_conn(dict_cursor=False):
-            _ = dict_cursor
-            yield conn
-
-        old_conn = auth.get_connection
-        old_ro = auth.DB_READ_ONLY
-        auth.get_connection = fake_conn
-        auth.DB_READ_ONLY = False
-        try:
-            user_id = auth.ensure_telegram_user(telegram_id=1234, username="tg_u", first_name="Tg", last_name=None)
-            self.assertEqual(user_id, 333)
-            self.assertTrue(any("insert into users" in q for q in calls))
-            self.assertFalse(any("insert into site_auth_accounts" in q for q in calls))
-        finally:
-            auth.get_connection = old_conn
-            auth.DB_READ_ONLY = old_ro
-
-    def test_telegram_login_uses_auth_users_view(self):
-        payload = TelegramAuthPayload(id=77, auth_date=123, hash="ok", first_name="u")
-        cursor = FakeCursor((77,))
-        restore = self._patch_auth(cursor)
-        try:
-            response = auth.login_telegram(payload)
-            self.assertEqual(response["user_id"], 77)
-            self.assertIn(f"FROM {self.contract.auth_users_view}", cursor.query)
-            self.assertNotIn(self.contract.public_users_view, cursor.query)
-        finally:
-            restore()
 
 
 if __name__ == "__main__":
