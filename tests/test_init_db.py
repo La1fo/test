@@ -10,7 +10,7 @@ class TestInitDBDiagnostics(unittest.TestCase):
         # Import module directly and monkeypatch symbols used in main()
         from backend import database
 
-        old_bot_db_url = database.BOT_DB_URL
+        old_database_dsn = database.DATABASE_DSN
         old_db_ro = database.DB_READ_ONLY
         old_legacy = database.LEGACY_SCHEMA_COMPAT
         old_get_contract = database.get_db_contract
@@ -25,7 +25,7 @@ class TestInitDBDiagnostics(unittest.TestCase):
         )
 
         try:
-            database.BOT_DB_URL = "postgresql://user:pass@db:5432/friendlymap"
+            database.DATABASE_DSN = "postgresql://user:pass@db:5432/friendlymap"
             database.DB_READ_ONLY = True
             database.LEGACY_SCHEMA_COMPAT = False
             database.get_db_contract = lambda: contract
@@ -48,7 +48,7 @@ class TestInitDBDiagnostics(unittest.TestCase):
             self.assertIn("view 'site_auth_users' отсутствует", output)
             self.assertIn("не содержит колонки: telegram_id", output)
         finally:
-            database.BOT_DB_URL = old_bot_db_url
+            database.DATABASE_DSN = old_database_dsn
             database.DB_READ_ONLY = old_db_ro
             database.LEGACY_SCHEMA_COMPAT = old_legacy
             database.get_db_contract = old_get_contract

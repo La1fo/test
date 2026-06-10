@@ -1,0 +1,13 @@
+<nav class="top-nav reveal">
+  <a href="/"{% if current_path == '/' %} class="active"{% endif %}>Главная</a>
+  <a href="/map"{% if current_path == '/map' %} class="active"{% endif %}>Карта</a>
+  <a href="/add-location"{% if current_path == '/add-location' %} class="active"{% endif %}>Добавить</a>
+  <a href="/achievements"{% if current_path == '/achievements' %} class="active"{% endif %}>Достижения</a>
+  <a href="/leaderboard"{% if current_path == '/leaderboard' %} class="active"{% endif %}>Топ</a>
+  <a href="/faq"{% if current_path == '/faq' %} class="active"{% endif %}>Помощь</a>
+  {% if current_user_id %}
+    <a href="/profile/me"{% if current_path == '/profile/me' %} class="active"{% endif %}>Мой профиль</a>
+  {% else %}
+    <a href="/login"{% if current_path == '/login' %} class="active"{% endif %}>Войти</a>
+  {% endif %}
+</nav>

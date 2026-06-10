@@ -45,12 +45,7 @@
   </style>
 </head>
 <body class="site-theme">
-  <nav class="top-nav reveal">
-    <a href="/">Главная</a>
-    <a href="/achievements">Достижения</a>
-    <a href="/leaderboard">Топ</a>
-    <a href="/faq" class="active">Помощь</a>
-  </nav>
+  {% include "_nav.html" %}
 
   <main class="page-shell">
     <section class="surface-card">
@@ -61,7 +56,7 @@
         <div class="expand-content">
         <div class="faq-item reveal">
           <div class="faq-question">Как сейчас добавить локацию?</div>
-          <div class="faq-answer">Через Telegram-бота: выберите добавление локации, укажите название и описание, поставьте точку на карте и отправьте фото места.</div>
+          <div class="faq-answer">Через страницу «Добавить»: войдите в аккаунт, укажите название и описание, поставьте точку на карте и загрузите фото места.</div>
         </div>
         <div class="faq-item reveal">
           <div class="faq-question">Когда локация появляется на карте?</div>
@@ -75,7 +70,7 @@
         <div class="expand-content">
         <div class="faq-item reveal">
           <div class="faq-question">Как работает система рангов?</div>
-          <div class="faq-answer">Ранг зависит от общего GP. Сайт отображает тот же ранг, что writer-side сервисы FriendlyMap.</div>
+          <div class="faq-answer">Ранг зависит от общего GP. Сайт отображает тот же ранг, что сайт FriendlyMap.</div>
         </div>
         <div class="faq-item reveal">
           <div class="faq-question">Какие ранги доступны?</div>
@@ -116,6 +111,7 @@
       category.classList.toggle('active');
     }
   </script>
+  <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
 </body>
 </html>

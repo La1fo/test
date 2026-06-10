@@ -2,12 +2,16 @@ import os
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from .database import get_connection, get_db_contract, validate_db_contract
+from .api import add_location, map as map_api
+from .api.auth import login_email, register_email_account
+from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
+from .migrations import ensure_add_location_schema, ensure_auth_schema
+from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
 
 load_dotenv()
 
@@ -16,9 +20,14 @@ app = FastAPI(title="Frendly Map Website")
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 frontend_path = os.path.join(project_root, "frontend")
+media_path = os.getenv("MEDIA_ROOT", os.path.join(project_root, "media"))
 
 app.mount("/static", StaticFiles(directory=frontend_path), name="static")
+os.makedirs(media_path, exist_ok=True)
+app.mount("/media", StaticFiles(directory=media_path), name="media")
 templates = Jinja2Templates(directory=frontend_path)
+app.include_router(add_location.router, prefix="/api/add-location", tags=["add-location"])
+app.include_router(map_api.router, prefix="/api/map", tags=["map"])
 
 WRITER_RANK_NAMES = (
     "🟢 Исследователь 1",
@@ -70,7 +79,7 @@ class ProfileRow:
     gp_display: str
 
 
-def _writer_rank_name(total_gp: int, position: int | None = None) -> str:
+def _site_rank_name(total_gp: int, position: int | None = None) -> str:
     if total_gp >= 1300 and position is not None and position <= 10:
         return MASTER_CARTOGRAPHER_RANK_NAME
     if total_gp >= 900:
@@ -84,13 +93,13 @@ def _display_rank_name(rank_name: str | None, total_gp: int, position: int | Non
     normalized = (rank_name or "").strip()
     if normalized in KNOWN_RANK_NAMES:
         return normalized
-    return _writer_rank_name(total_gp, position)
+    return _site_rank_name(total_gp, position)
 
 
 def _format_gp_display(total_gp: int, gp_in_rank: int, rank_name: str) -> str:
-    _ = gp_in_rank
+    _ = total_gp
     _ = rank_name
-    return str(max(0, total_gp))
+    return str(max(0, gp_in_rank))
 
 
 def _contract_healthcheck() -> str | None:
@@ -109,6 +118,9 @@ def startup_contract_check() -> None:
     error = _contract_healthcheck()
     if error:
         raise RuntimeError(error)
+    if not DB_READ_ONLY:
+        ensure_add_location_schema()
+        ensure_auth_schema()
 
 
 def _load_leaderboard() -> tuple[list[LeaderboardRow], str | None]:
@@ -236,10 +248,31 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
 
 
 def get_context(request: Request):
+    current_user_id = get_current_user_id(request, required=False)
+    current_path = getattr(getattr(request, "url", None), "path", "")
     return {
         "request": request,
-        "bot_username": os.getenv("TELEGRAM_BOT_USERNAME", "FrendlyMapBot"),
+                "current_user_id": current_user_id,
+        "is_authenticated": current_user_id is not None,
+        "current_path": current_path,
     }
+
+
+def _normalize_next(next_url: str | None, default: str = "/") -> str:
+    candidate = (next_url or "").strip()
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    return candidate
+
+
+def _set_session_cookie(response: RedirectResponse, user_id: int) -> None:
+    response.set_cookie(
+        SESSION_COOKIE_NAME,
+        create_session_cookie(user_id),
+        httponly=True,
+        samesite="lax",
+        secure=os.getenv("SESSION_COOKIE_SECURE", "0") == "1",
+    )
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -250,6 +283,53 @@ async def home(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", get_context(request))
+
+
+@app.post("/api/session/email")
+async def login_email_page(request: Request, email: str = Body(...), password: str = Body(...), next: str = Body("/")):
+    _ = request
+    if not email.strip() or not password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    result = login_email(email=email, password=password)
+    response = RedirectResponse(url=_normalize_next(next), status_code=303)
+    _set_session_cookie(response, int(result["user_id"]))
+    return response
+
+
+@app.post("/api/session/register")
+async def register_email_page(
+    request: Request,
+    username: str = Body(...),
+    email: str = Body(...),
+    password: str = Body(...),
+    confirm_password: str = Body(...),
+    next: str = Body("/profile/me"),
+):
+    _ = request
+    if DB_READ_ONLY:
+        raise HTTPException(status_code=503, detail="Registration disabled in read-only DB mode")
+    if password != confirm_password:
+        raise HTTPException(status_code=400, detail="Password confirmation does not match")
+    user_id = register_email_account(username=username, email=email, password=password)
+    response = RedirectResponse(url=_normalize_next(next, default="/profile/me"), status_code=303)
+    _set_session_cookie(response, int(user_id))
+    return response
+
+
+
+@app.get("/logout")
+async def logout(next: str | None = None):
+    response = RedirectResponse(url=_normalize_next(next), status_code=303)
+    response.delete_cookie(SESSION_COOKIE_NAME)
+    return response
+
+
+@app.get("/api/session/me")
+async def session_me(request: Request):
+    user_id = get_current_user_id(request, required=False)
+    if user_id is None:
+        return JSONResponse({"authenticated": False, "user_id": None})
+    return JSONResponse({"authenticated": True, "user_id": int(user_id)})
 
 
 @app.get("/achievements", response_class=HTMLResponse)
@@ -274,6 +354,22 @@ async def leaderboard_page(request: Request):
 @app.get("/faq", response_class=HTMLResponse)
 async def faq_page(request: Request):
     return templates.TemplateResponse("faq.html", get_context(request))
+
+
+@app.get("/add-location", response_class=HTMLResponse)
+async def add_location_page(request: Request):
+    return templates.TemplateResponse("add-location.html", get_context(request))
+
+
+@app.get("/map", response_class=HTMLResponse)
+async def map_page(request: Request):
+    return templates.TemplateResponse("map.html", get_context(request))
+
+
+@app.get("/profile/me", response_class=HTMLResponse)
+async def my_profile_page(request: Request):
+    user_id = get_current_user_id(request, required=True)
+    return await profile_page(request, user_id)
 
 
 @app.get("/profile/{user_id}", response_class=HTMLResponse)

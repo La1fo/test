@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Добавить локацию — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    .wizard-grid { display:grid; gap:14px; }
+    .field { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; text-align:left; }
+    .field input, .field textarea, .field select {
+      border:1px solid #d4e2f0; border-radius:10px; padding:10px 12px; font-size:15px;
+    }
+    .field textarea { min-height:110px; resize:vertical; }
+    .step { border:1px solid #e3edf8; border-radius:12px; padding:14px; background:#fbfdff; }
+    .step h3 { margin:0 0 10px; color:#0b67b2; }
+    .tag-list { display:flex; flex-wrap:wrap; gap:8px; }
+    .tag-chip { border:1px solid #c8ddef; border-radius:999px; padding:6px 10px; cursor:pointer; user-select:none; }
+    .tag-chip.active { background:#0b67b2; color:#fff; border-color:#0b67b2; }
+    .photo-preview { display:flex; flex-wrap:wrap; gap:8px; }
+    .photo-pill { background:#eef6ff; color:#215781; border-radius:999px; padding:6px 10px; font-size:13px; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .btn { border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:600; }
+    .btn-primary { background:#0b67b2; color:#fff; }
+    .btn-secondary { background:#eaf3fb; color:#2f5b80; }
+    .status { margin-top:8px; font-size:14px; color:#2f5b80; }
+    .status.error { color:#b33a3a; }
+    .preview-box { background:#fff; border:1px dashed #b7cee4; border-radius:10px; padding:12px; text-align:left; }
+  </style>
+</head>
+<body class="site-theme">
+  {% include "_nav.html" %}
+
+  <main class="page-shell">
+    <section class="surface-card wizard-grid">
+      <h1 class="page-title">Добавление локации</h1>
+      {% if not current_user_id %}
+      <div class="warning">
+        Для добавления локации нужна авторизация.
+        <a href="/login?next=/add-location">Войти</a>
+      </div>
+      {% else %}
+      <p class="muted-text">Заполните данные и отправьте новую локацию на модерацию.</p>
+      {% endif %}
+
+      {% if current_user_id %}
+      <form id="addLocationForm" class="wizard-grid">
+        <div class="step">
+          <h3>1. Название</h3>
+          <div class="field"><input id="name" maxlength="120" placeholder="Например: Парк у набережной" required /></div>
+        </div>
+
+        <div class="step">
+          <h3>2. Описание</h3>
+          <div class="field"><textarea id="description" maxlength="3000" placeholder="Опишите доступность места" required></textarea></div>
+        </div>
+
+        <div class="step">
+          <h3>3. Координаты</h3>
+          <p class="muted-text">Основной способ выбора точки — маркер на карте (ручной ввод скрыт как технический fallback).</p>
+          <button id="myLocationBtn" type="button" class="btn btn-secondary">Определить мою геопозицию</button>
+          <div id="pickerMap" style="height:320px;border-radius:10px;"></div>
+          <div class="field"><input id="coordinatesLabel" readonly placeholder="Кликните на карту, чтобы выбрать точку" /></div>
+          <input id="latitude" type="hidden" />
+          <input id="longitude" type="hidden" />
+        </div>
+
+        <div class="step">
+          <h3>4. Теги (до 5)</h3>
+          <div id="tagList" class="tag-list"></div>
+        </div>
+
+        <div class="step">
+          <h3>5. Фото</h3>
+          <div class="field"><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple required /></div>
+          <div id="photoPreview" class="photo-preview"></div>
+        </div>
+
+        <div class="step">
+          <h3>6. Preview</h3>
+          <div id="preview" class="preview-box">
+            <div><strong>Название:</strong> —</div>
+            <div><strong>Описание:</strong> —</div>
+            <div><strong>Координаты:</strong> —</div>
+            <div><strong>Теги:</strong> —</div>
+            <div><strong>Фото:</strong> —</div>
+            <div><strong>Статус интеграции:</strong> —</div>
+          </div>
+          <div id="status" class="status"></div>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="previewBtn" class="btn btn-secondary">Проверить preview</button>
+          <button type="submit" class="btn btn-primary">Отправить</button>
+        </div>
+      </form>
+      {% endif %}
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/add-location.js"></script>
+  <!-- Jivo widget -->
+  <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
+</body>
+</html>

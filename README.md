@@ -1,9 +1,8 @@
-# FriendlyMap Site (Reader Service)
+# FriendlyMap Site
 
-Сайт работает как **reader-only** сервис поверх общей БД FriendlyMap.
-Бот/основной backend — единственные writer-сервисы.
+Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию.
 
-## Обязательный DB contract (read-only VIEW)
+## Обязательный DB contract (VIEW)
 Сайт ожидает в `public` следующие VIEW:
 
 1. `site_leaderboard`
@@ -18,7 +17,7 @@
 2. `site_public_users`
    - `user_id`
    - `username`
-   - `telegram_id`
+   - `telegram_id` (legacy nullable column; не нужен для веб-регистрации)
    - `total_gp`
    - `rank_level`
    - `gp_in_rank`
@@ -40,9 +39,9 @@
 5. `site_auth_users`
    - `user_id`
    - `username`
-   - `telegram_id`
+   - `telegram_id` (legacy nullable column)
    - `email`
-   - `hashed_password`
+   - `hashed_password` (`users.password_hash`)
 
 ## Каноническая ранговая система
 Источник истины — `total_gp`.
@@ -52,15 +51,16 @@
 - `gp_in_rank = total_gp % 100`
 - `rank_name = "Ранг {rank_level}"`
 
-Пример:
-- `total_gp=99` → `Ранг 1`, `99 GP`
-- `total_gp=102` → `Ранг 2`, `2 GP`
-
-## Роль БД (минимальные права)
-Рекомендуемая роль сайта: `friendly_site_ro`
+## Роль БД
+Для read-only режима достаточно роли `friendly_site_ro`:
 - `CONNECT` к БД
 - `USAGE` на `public`
-- `SELECT` только на `site_*` VIEW
+- `SELECT` на `site_*` VIEW
+
+Для write-mode рекомендуется отдельная роль `friendly_site_rw`:
+- `SELECT` на `site_*` VIEW
+- `INSERT/UPDATE` на `users`, `locations`, `photos`, `tags`, `location_tags`, `site_submission_idempotency`
+- права на соответствующие sequence (`USAGE`, `SELECT`, при необходимости `UPDATE`)
 
 ## Запуск
 1. Создать venv:
@@ -82,47 +82,66 @@
    python3 -m backend.main
    ```
 
-## Legacy compatibility
-По умолчанию отключён:
-- `LEGACY_SCHEMA_COMPAT=0` — строгий контрактный режим
-- `LEGACY_SCHEMA_COMPAT=1` — временный fallback legacy-маппинга (только миграция)
-
-## Ограничения read-only режима
-- Сайт не пишет в shared бизнес-данные.
-- Email registration на reader-сервисе отключена.
-- Telegram/email login только чтение через `site_auth_users`.
-
-## Отображение рангов на сайте
-- Сайт показывает только `Ранг` и `GP`, без `Общий GP` и без `GP в ранге`.
-- Для рангов 1–9 UI показывает `GP: X/100`.
-- Для `🟣 Картограф` UI показывает `GP: X/400`, где `X = min(total_gp - 900, 400)`.
-- Для `⭐ Мастер-картограф` UI показывает `GP: 400/400` при `total_gp = 1300` и `GP: 400+/400` при `total_gp > 1300`.
-
 ## Runtime: какие VIEW использует сайт
 - `/leaderboard` → `site_leaderboard`
 - `/profile/{user_id}` → `site_public_users`
+- `/profile/me` → protected профиль текущего пользователя
 - `/achievements` → `site_achievements_overview`
-- `/auth/telegram` → `site_auth_users`
-- `/auth/email/login` → `site_auth_users`
-- `/auth/email/register` → отключён на reader-side (`403`)
+- `/add-location` → web add-location flow
+- `/map` → карта подтверждённых локаций
+- `/login` → email login + email registration
+- `/logout` → выход из cookie-сессии
 
-## Startup diagnostics
-- `python3 -m backend.init_db` печатает режим схемы (`strict-contract`/`legacy-compat`) и ожидаемые VIEW.
-- При ошибке контракта выводится конкретная диагностика: отсутствующая VIEW и/или список недостающих колонок.
+## Auth и session
+- `POST /api/session/register` создаёт запись в `users` (`email`, `password_hash`, профильные defaults) и сразу ставит signed cookie `fm_session`.
+- `POST /api/session/email` логинит по `site_auth_users.email` + `hashed_password`.
+- `GET /api/session/me` возвращает `{ authenticated, user_id }`.
+- Navbar единый на всех страницах: guest видит `Войти`, auth user видит `Мой профиль`; `Выйти` доступен на странице профиля.
 
-## Release verification steps
-1. Проверить контракт и диагностику старта:
-   ```bash
-   python3 -m backend.init_db
-   ```
-2. Запустить unit-тесты (contract/auth/runtime/rank):
-   ```bash
-   python3 -m unittest discover -s tests -v
-   ```
-3. Запустить сайт и открыть ключевые страницы:
-   - `/leaderboard`
-   - `/profile/{user_id}`
-   - `/achievements`
-4. Проверить auth reader-flow:
-   - `/auth/telegram` и `/auth/email/login` читают только `site_auth_users`
-   - `/auth/email/register` возвращает `403`
+## Add-location flow
+- UI-страница: `/add-location`
+- API:
+  - `GET /api/add-location/form-config`
+  - `POST /api/add-location/upload`
+  - `POST /api/add-location/preview`
+  - `POST /api/add-location/submit`
+  - `GET /api/map/locations`
+  - `GET /api/map/tags`
+
+### Что реализовано
+- Пошаговый UX (name/description/coordinates/tags/photos/preview/submit).
+- Выбор координат через Leaflet marker selection; ручной ввод скрыт как fallback.
+- Geolocation на `/add-location` и `/map`.
+- Client-side + server-side валидация обязательных полей.
+- Реальная запись pending-локации в write-mode (`DB_READ_ONLY=0`).
+- Атомарный submit path с idempotency key, привязанным к `user_id` текущей веб-сессии.
+- Upload и хранение web-фото в `MEDIA_ROOT`.
+- Каталог тегов берётся из БД (`tags`) и seed-ится полным каталогом FriendlyMap.
+- `/add-location` для гостя показывает auth-required CTA; `/map` для гостя доступна для просмотра и показывает login CTA.
+
+## Runtime требования для write-mode
+- `DB_READ_ONLY=0`
+- `SECRET_KEY` задан (подпись session-cookie)
+- `MEDIA_ROOT` доступен на запись
+- write-права к `users`, `locations`, `tags`, `location_tags`, `photos`, `site_submission_idempotency`
+
+### Auth / session env vars
+- `SECRET_KEY` — обязателен для подписи web cookie-сессий.
+- `SESSION_TTL_SECONDS` — TTL cookie-сессии (по умолчанию 86400 секунд).
+- `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
+
+## Миграции
+В write-mode на старте вызываются:
+- `ensure_add_location_schema()`:
+  - добавляет web-photo колонки в `photos`,
+  - создаёт `site_submission_idempotency` с `user_id`,
+  - создаёт/синхронизирует `tags` и полный FriendlyMap tag catalog.
+- `ensure_auth_schema()`:
+  - добавляет auth/profile поля в `users` (`email`, `password_hash`, `email_verified`, и др.),
+  - создаёт уникальный индекс `LOWER(email)`,
+  - если `site_auth_users` view отсутствует — создаёт fallback view на основе `users`.
+
+При `DB_READ_ONLY=1`:
+- registration отключена,
+- add-location upload/submit отключены,
+- публичные reader routes и карта остаются доступными.

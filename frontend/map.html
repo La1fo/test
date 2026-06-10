@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Карта — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    #map { height: 70vh; border-radius: 12px; }
+    .map-controls { background:#fff; padding:12px; border-radius:10px; display:grid; grid-template-columns:2fr 1.2fr auto auto; gap:8px; margin-bottom:10px; align-items:center; border:1px solid #d6e2ef; }
+    .map-controls input,.map-controls select,.map-controls button { min-height:40px; padding:8px 10px; border:1px solid #d6e2ef; border-radius:8px; font-size:14px; }
+    .map-controls button { background:#fff; cursor:pointer; white-space:nowrap; font-weight:600; }
+    .map-controls button:hover { background:#f4f9ff; }
+    @media (max-width: 860px) {
+      .map-controls { grid-template-columns:1fr; }
+      .map-controls button { width:100%; }
+    }
+  </style>
+</head>
+<body class="site-theme">
+  {% include "_nav.html" %}
+  <main class="page-shell">
+    <section class="surface-card">
+      <h1 class="page-title">Карта подтверждённых локаций</h1>
+      {% if not current_user_id %}
+      <div class="warning" style="margin-bottom:12px;">
+        Вы просматриваете карту как гость. Чтобы добавлять новые локации и управлять своими отправками, войдите в аккаунт.
+        <a href="/login?next=/map" style="margin-left:8px;">Войти</a>
+      </div>
+      {% endif %}
+      <div class="map-controls">
+        <input id="search" placeholder="Поиск по названию/описанию">
+        <select id="tagFilter"><option value="">Все теги</option></select>
+        <button id="applyFilters" type="button">Применить</button>
+        <button id="myGeo" type="button">Моя геопозиция</button>
+      </div>
+      <div id="map"></div>
+    </section>
+  </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    const map = L.map('map').setView([55.751244, 37.618423], 10);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19}).addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
+
+    async function loadMapTags() {
+      const res = await fetch('/api/map/tags');
+      const payload = await res.json();
+      const tags = payload.tags || [];
+      const select = document.getElementById('tagFilter');
+      const current = select.value;
+      select.innerHTML = '<option value="">Все теги</option>';
+      const grouped = {};
+      tags.forEach((tag) => {
+        const category = tag.category || 'Прочее';
+        if (!grouped[category]) grouped[category] = [];
+        grouped[category].push(tag);
+      });
+      Object.keys(grouped).sort().forEach((category) => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = category;
+        grouped[category].forEach((tag) => {
+          const option = document.createElement('option');
+          option.value = tag.id;
+          option.textContent = tag.label;
+          if (current && (current === tag.id || current === tag.label)) option.selected = true;
+          optgroup.appendChild(option);
+        });
+        select.appendChild(optgroup);
+      });
+    }
+
+    async function loadLocations() {
+      const q = document.getElementById('search').value.trim();
+      const tag = document.getElementById('tagFilter').value;
+      const params = new URLSearchParams();
+      if (q) params.set('q', q);
+      if (tag) params.set('tag', tag);
+      const res = await fetch('/api/map/locations?' + params.toString());
+      const items = await res.json();
+
+      markersLayer.clearLayers();
+      items.forEach(loc => {
+        const marker = L.marker([loc.latitude, loc.longitude]).addTo(markersLayer);
+        const tags = (loc.tags || []).join(', ') || '—';
+        const photo = loc.photo_url ? `<img src="${loc.photo_url}" style="max-width:220px;display:block;margin-top:6px;">` : '';
+        marker.bindPopup(`<strong>${loc.name}</strong><br>${loc.description || ''}<br><small>Теги: ${tags}</small>${photo}`);
+      });
+    }
+
+    document.getElementById('applyFilters').addEventListener('click', loadLocations);
+    document.getElementById('myGeo').addEventListener('click', () => {
+      if (!navigator.geolocation) return alert('Геолокация недоступна');
+      navigator.geolocation.getCurrentPosition(
+        (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 14),
+        () => alert('Не удалось определить геопозицию'),
+      );
+    });
+
+    Promise.all([loadMapTags(), loadLocations()]);
+  </script>
+  <!-- Jivo widget -->
+  <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
+</body>
+</html>

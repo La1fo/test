@@ -61,26 +61,3 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     signature = _sign(signing_input)
     return f"{encoded_header}.{encoded_payload}.{signature}"
 
-
-def verify_telegram_auth(data: dict, bot_token: str) -> bool:
-    if not bot_token:
-        return False
-
-    payload = data.copy()
-    check_hash = payload.pop("hash", None)
-    if not check_hash:
-        return False
-
-    auth_date = payload.get("auth_date")
-    try:
-        auth_dt = datetime.fromtimestamp(int(auth_date), tz=timezone.utc)
-    except (TypeError, ValueError):
-        return False
-
-    if datetime.now(timezone.utc) - auth_dt > timedelta(minutes=10):
-        return False
-
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(payload.items()))
-    secret_key = hashlib.sha256(bot_token.encode()).digest()
-    expected_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected_hash, check_hash)
