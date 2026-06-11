@@ -42,6 +42,24 @@ class TestTemplates(unittest.TestCase):
         self.assertIn('href="/add-location"', nav)
         self.assertIn('href="/map"', nav)
 
+    def test_nav_background_expands_under_all_buttons(self):
+        theme = self._read("page-theme.css")
+        home = self._read("index.html")
+        for css in (theme, home):
+            self.assertIn("flex-wrap: wrap", css)
+            self.assertIn("align-items: center", css)
+            self.assertIn("width: min(100%, 1120px)", css)
+            self.assertNotIn("max-width: 700px", css)
+
+    def test_add_location_success_offer_present(self):
+        page = self._read("add-location.html")
+        add_js = Path("/workspace/test/frontend/add-location.js").read_text()
+        self.assertIn('id="successPanel"', page)
+        self.assertIn("Локация отправлена на модерацию", page)
+        self.assertIn("Добавить новую локацию", page)
+        self.assertIn("showModerationSuccess", add_js)
+        self.assertIn("resetFormForNewLocation", add_js)
+
     def test_login_and_register_are_separate_username_pages(self):
         login = self._read("login.html")
         register = self._read("register.html")

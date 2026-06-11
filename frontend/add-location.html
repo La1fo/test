@@ -27,6 +27,18 @@
     .status { margin-top:8px; font-size:14px; color:#2f5b80; }
     .status.error { color:#b33a3a; }
     .preview-box { background:#fff; border:1px dashed #b7cee4; border-radius:10px; padding:12px; text-align:left; }
+    .success-panel {
+      display:none;
+      background:#f0fbf6;
+      border:1px solid #b9ecd1;
+      border-radius:16px;
+      padding:20px;
+      text-align:center;
+    }
+    .success-panel.active { display:block; }
+    .success-panel h2 { margin:0 0 10px; color:#137a4d; }
+    .success-panel p { margin:0 0 16px; color:#2f5b4c; line-height:1.5; }
+    .success-panel .btn { display:inline-flex; align-items:center; justify-content:center; }
   </style>
 </head>
 <body class="site-theme">
@@ -45,6 +57,12 @@
       {% endif %}
 
       {% if current_user_id %}
+      <div id="successPanel" class="success-panel" role="status" aria-live="polite">
+        <h2>Локация отправлена на модерацию</h2>
+        <p id="successMessage">Спасибо! Мы проверим данные и опубликуем локацию после модерации.</p>
+        <button type="button" id="addAnotherBtn" class="btn btn-primary">Добавить новую локацию</button>
+      </div>
+
       <form id="addLocationForm" class="wizard-grid">
         <div class="step">
           <h3>1. Название</h3>
