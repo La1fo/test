@@ -25,12 +25,14 @@
       padding: 14px 30px;
       border-radius: 50px;
       display: flex;
+      flex-wrap: wrap;
       justify-content: center;
+      align-items: center;
       gap: 16px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       margin: 40px auto 88px;
-      width: 100%;
-      max-width: 700px;
+      width: min(100%, 1120px);
+      max-width: 100%;
       z-index: 10;
     }
 
@@ -48,6 +50,20 @@
     .top-nav a.active {
       background: #2997f5;
       color: white;
+    }
+
+    @media (max-width: 768px) {
+      .top-nav {
+        width: 100%;
+        gap: 8px;
+        padding: 12px;
+        border-radius: 18px;
+      }
+
+      .top-nav a {
+        font-size: 1rem;
+        padding: 8px 12px;
+      }
     }
 
     .hero-card {

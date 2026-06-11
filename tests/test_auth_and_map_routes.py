@@ -116,6 +116,59 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             main.DB_READ_ONLY = old_ro
 
 
+
+    def test_admin_routes_registered(self):
+        paths = {route.path for route in main.app.routes}
+        self.assertIn("/moderation", paths)
+        self.assertIn("/admin/users", paths)
+        self.assertIn("/api/admin/pending-locations", paths)
+        self.assertIn("/api/admin/locations/{location_id}/approve", paths)
+        self.assertIn("/api/admin/users/{user_id}/grant", paths)
+
+    def test_moderation_page_requires_admin_and_renders(self):
+        old_require = main._require_admin
+        old_loader = main._load_pending_locations
+        main._require_admin = lambda request: 1
+        main._load_pending_locations = lambda: ([], None)
+        try:
+            response = asyncio.run(main.moderation_page(SimpleNamespace(cookies={})))
+            self.assertEqual(response.template.name, "moderation.html")
+        finally:
+            main._require_admin = old_require
+            main._load_pending_locations = old_loader
+
+    def test_admin_users_page_requires_admin_and_renders(self):
+        old_require = main._require_admin
+        old_loader = main._load_admin_users
+        main._require_admin = lambda request: 1
+        main._load_admin_users = lambda: ([], None)
+        try:
+            response = asyncio.run(main.admin_users_page(SimpleNamespace(cookies={})))
+            self.assertEqual(response.template.name, "admin-users.html")
+        finally:
+            main._require_admin = old_require
+            main._load_admin_users = old_loader
+
+    def test_approve_and_grant_admin_endpoints_call_services(self):
+        calls = []
+        old_require = main._require_admin
+        old_status = main._set_location_moderation_status
+        old_grant = main._grant_admin
+        main._require_admin = lambda request: 1
+        main._set_location_moderation_status = lambda location_id, status: calls.append(("status", location_id, status))
+        main._grant_admin = lambda user_id: calls.append(("grant", user_id))
+        try:
+            approve = asyncio.run(main.approve_location(55, SimpleNamespace(cookies={})))
+            grant = asyncio.run(main.grant_admin(77, SimpleNamespace(cookies={})))
+            self.assertEqual(approve.status_code, 200)
+            self.assertEqual(grant.status_code, 200)
+            self.assertIn(("status", 55, "approved"), calls)
+            self.assertIn(("grant", 77), calls)
+        finally:
+            main._require_admin = old_require
+            main._set_location_moderation_status = old_status
+            main._grant_admin = old_grant
+
     def test_standalone_site_has_no_telegram_session_route(self):
         paths = {route.path for route in main.app.routes}
         self.assertNotIn("/api/session/telegram", paths)

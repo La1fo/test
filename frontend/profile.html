@@ -40,6 +40,10 @@
       {% if current_user_id and profile and current_user_id == profile.user_id %}
       <div class="profile-actions">
         <a class="btn-link btn-secondary-link" href="/add-location">Добавить локацию</a>
+        {% if current_user_is_admin %}
+          <a class="btn-link btn-secondary-link" href="/moderation">Модерировать локации</a>
+          <a class="btn-link btn-primary-link" href="/admin/users">Добавить администратора</a>
+        {% endif %}
         <a class="btn-link btn-primary-link" href="/logout?next=/">Выйти</a>
       </div>
       {% endif %}

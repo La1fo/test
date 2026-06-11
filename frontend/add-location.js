@@ -19,6 +19,9 @@
   const previewBox = document.getElementById('preview');
   const statusBox = document.getElementById('status');
   const coordinatesLabel = document.getElementById('coordinatesLabel');
+  const successPanel = document.getElementById('successPanel');
+  const successMessage = document.getElementById('successMessage');
+  const addAnotherBtn = document.getElementById('addAnotherBtn');
   let pickerMap = null;
   let marker = null;
 
@@ -46,6 +49,42 @@
     statusBox.classList.toggle('error', isError);
   }
 
+  function resetFormForNewLocation() {
+    form.reset();
+    state.tags.clear();
+    state.uploadedPhotos = [];
+    state.selectedPoint = null;
+    document.getElementById('latitude').value = '';
+    document.getElementById('longitude').value = '';
+    coordinatesLabel.value = '';
+    if (marker) {
+      marker.remove();
+      marker = null;
+    }
+    renderTags();
+    renderUploadedPhotos();
+    previewBox.innerHTML = `
+      <div><strong>Название:</strong> —</div>
+      <div><strong>Описание:</strong> —</div>
+      <div><strong>Координаты:</strong> —</div>
+      <div><strong>Теги:</strong> —</div>
+      <div><strong>Фото:</strong> —</div>
+      <div><strong>Статус интеграции:</strong> —</div>
+    `;
+    successPanel?.classList.remove('active');
+    form.hidden = false;
+    setStatus('Можно добавить новую локацию. Выберите точку на карте или кнопкой геолокации.');
+    form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function showModerationSuccess(locationId) {
+    const locationText = locationId ? `Локация #${locationId}` : 'Локация';
+    successMessage.textContent = `${locationText} отправлена на модерацию. Спасибо! Вы можете сразу предложить ещё одну локацию.`;
+    successPanel?.classList.add('active');
+    form.hidden = true;
+    setStatus(`${locationText} отправлена на модерацию.`);
+    successPanel?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   async function loadConfig() {
     const res = await fetch('/api/add-location/form-config');
@@ -291,11 +330,12 @@
       return;
     }
 
-    setStatus(`Локация #${data.location_id} отправлена на модерацию.`);
+    showModerationSuccess(data.location_id);
   }
 
   document.getElementById('previewBtn').addEventListener('click', runPreview);
   document.getElementById('myLocationBtn').addEventListener('click', useMyLocation);
+  addAnotherBtn?.addEventListener('click', resetFormForNewLocation);
   photoInput.addEventListener('change', uploadSelectedPhotos);
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
