@@ -1,6 +1,6 @@
 # FriendlyMap Site
 
-Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию.
+Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию. В write-mode сайт сам создаёт и обновляет нужные таблицы, индексы, справочники и `site_*` VIEW при запуске.
 
 ## Обязательный DB contract (VIEW)
 Сайт ожидает в `public` следующие VIEW:
@@ -73,10 +73,11 @@
    python3 -m pip install -r requirements.txt
    ```
 3. Заполнить `.env`.
-4. Проверить контракт:
+4. Инициализировать/проверить БД:
    ```bash
    python3 -m backend.init_db
    ```
+   При `DB_READ_ONLY=0` команда создаст/обновит таблицы сайта, заполнит каталог тегов и пересоздаст контрактные `site_*` VIEW, затем проверит контракт. При `DB_READ_ONLY=1` команда только проверяет заранее подготовленный контракт.
 5. Запустить сайт:
    ```bash
    python3 -m backend.main
@@ -123,7 +124,7 @@
 - `DB_READ_ONLY=0`
 - `SECRET_KEY` задан (подпись session-cookie)
 - `MEDIA_ROOT` доступен на запись
-- write-права к `users`, `locations`, `tags`, `location_tags`, `photos`, `site_submission_idempotency`
+- write-права к `users`, `locations`, `photos`, `tags`, `location_tags`, `achievements`, `user_achievements`, `site_submission_idempotency` и права на соответствующие sequence
 
 ### Auth / session env vars
 - `SECRET_KEY` — обязателен для подписи web cookie-сессий.
@@ -131,15 +132,13 @@
 - `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
 
 ## Миграции
-В write-mode на старте вызываются:
-- `ensure_add_location_schema()`:
-  - добавляет web-photo колонки в `photos`,
-  - создаёт `site_submission_idempotency` с `user_id`,
-  - создаёт/синхронизирует `tags` и полный FriendlyMap tag catalog.
-- `ensure_auth_schema()`:
-  - добавляет auth/profile поля в `users` (`email`, `password_hash`, `email_verified`, и др.),
-  - создаёт уникальный индекс `LOWER(email)`,
-  - если `site_auth_users` view отсутствует — создаёт fallback view на основе `users`.
+В write-mode (`DB_READ_ONLY=0`) на старте вызывается `ensure_site_schema()`:
+- `ensure_core_schema()` создаёт базовые таблицы сайта: `users`, `locations`, `photos`, `tags`, `location_tags`, `achievements`, `user_achievements`; для частично существующих таблиц добавляет недостающие колонки и индексы.
+- `ensure_add_location_schema()` добавляет web-photo колонки в `photos`, создаёт `site_submission_idempotency`, создаёт/синхронизирует `tags` и полный FriendlyMap tag catalog.
+- `ensure_auth_schema()` добавляет auth/profile поля в `users` (`email`, `password_hash`, `email_verified`, и др.) и создаёт уникальный индекс `LOWER(email)`.
+- `ensure_contract_views()` создаёт/обновляет все контрактные `site_*` VIEW: `site_public_users`, `site_leaderboard`, `site_public_locations`, `site_achievements_overview`, `site_auth_users`.
+
+После миграций приложение всегда запускает проверку DB contract, поэтому если VIEW не соответствуют ожиданиям, сайт останавливается с понятной ошибкой.
 
 При `DB_READ_ONLY=1`:
 - registration отключена,

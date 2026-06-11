@@ -1,4 +1,4 @@
-"""Проверка готовности read-only DB contract для сайта FriendlyMap."""
+"""Инициализация write-mode схемы и проверка DB contract для FriendlyMap."""
 
 from urllib.parse import urlsplit
 
@@ -17,6 +17,7 @@ def _safe_db_url(db_url: str) -> str:
 def main() -> int:
     try:
         from .database import DATABASE_DSN, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
+        from .migrations import ensure_site_schema
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
         print(f"Причина: {exc}")
@@ -37,6 +38,10 @@ def main() -> int:
     print(f"- auth_users: {contract.auth_users_view}")
 
     try:
+        if not DB_READ_ONLY:
+            print("Создаём/обновляем таблицы и VIEW сайта...")
+            ensure_site_schema()
+
         ok, errors = validate_db_contract()
         if ok:
             print("✅ DB contract валиден")
