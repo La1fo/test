@@ -1,5 +1,6 @@
 import unittest
 from contextlib import contextmanager
+from pathlib import Path
 
 from backend import add_location_contract as contract
 from backend import migrations
@@ -103,6 +104,14 @@ class TestMigrationIdentifierHelpers(unittest.TestCase):
     def test_split_relation_name_rejects_unsafe_identifier(self):
         with self.assertRaises(ValueError):
             migrations._split_relation_name("public.site_auth_users;DROP")
+
+
+
+    def test_auth_schema_seeds_laifo_admin(self):
+        migration_source = Path("/workspace/test/backend/migrations.py").read_text()
+        self.assertIn("is_admin BOOLEAN DEFAULT FALSE", migration_source)
+        self.assertIn("LOWER(username) = 'laifo'", migration_source)
+        self.assertIn("SET is_admin = TRUE", migration_source)
 
 
 if __name__ == "__main__":

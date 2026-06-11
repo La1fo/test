@@ -112,7 +112,15 @@ def ensure_auth_schema() -> None:
                 ADD COLUMN IF NOT EXISTS show_name_on_map BOOLEAN DEFAULT TRUE,
                 ADD COLUMN IF NOT EXISTS notify_points BOOLEAN DEFAULT TRUE,
                 ADD COLUMN IF NOT EXISTS language TEXT DEFAULT 'ru',
-                ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light'
+                ADD COLUMN IF NOT EXISTS theme TEXT DEFAULT 'light',
+                ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT FALSE
+                """
+            )
+            cur.execute(
+                """
+                UPDATE users
+                SET is_admin = TRUE
+                WHERE LOWER(username) = 'laifo'
                 """
             )
             cur.execute(

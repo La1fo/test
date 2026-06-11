@@ -34,7 +34,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn('href="/logout"', nav)
 
     def test_pages_use_shared_nav_include(self):
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]:
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html", "moderation.html", "admin-users.html"]:
             self.assertIn('{% include "_nav.html" %}', self._read(file_name))
 
     def test_nav_has_add_location_link_on_key_pages(self):
@@ -75,7 +75,7 @@ class TestTemplates(unittest.TestCase):
     def test_logout_available_on_profile_page_only(self):
         profile = self._read("profile.html")
         self.assertIn("/logout?next=/", profile)
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "login.html", "register.html", "add-location.html", "map.html"]:
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "login.html", "register.html", "add-location.html", "map.html", "moderation.html", "admin-users.html"]:
             self.assertNotIn("/logout?next=/", self._read(file_name))
 
     def test_achievements_page_no_old_slogan(self):
@@ -97,7 +97,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("400+/400", leaderboard)
 
     def test_no_stale_support_blocks_on_user_pages(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html", "moderation.html", "admin-users.html"]
         forbidden_tokens = ["chat-widget", "/api/support", "support-form", "support-block"]
         for file_name in pages:
             html = self._read(file_name)
@@ -134,6 +134,27 @@ class TestTemplates(unittest.TestCase):
     def test_jivo_script_present_on_map_page(self):
         self._assert_jivo_widget("map.html")
 
+    def test_jivo_script_present_on_moderation_page(self):
+        self._assert_jivo_widget("moderation.html")
+
+    def test_jivo_script_present_on_admin_users_page(self):
+        self._assert_jivo_widget("admin-users.html")
+
+    def test_admin_templates_have_moderation_and_grant_controls(self):
+        nav = self._read("_nav.html")
+        profile = self._read("profile.html")
+        moderation = self._read("moderation.html")
+        admin_users = self._read("admin-users.html")
+        self.assertIn('href="/moderation"', nav)
+        self.assertIn('href="/admin/users"', profile)
+        self.assertIn("Добавить администратора", profile)
+        self.assertIn("Модерация локаций", moderation)
+        self.assertIn('data-action="approve"', moderation)
+        self.assertIn('data-action="reject"', moderation)
+        self.assertIn("/api/admin/locations/", moderation)
+        self.assertIn("Выдать права", admin_users)
+        self.assertIn("/api/admin/users/", admin_users)
+
     def test_profile_ui_does_not_use_old_gp_labels(self):
         profile_template = self._read("profile.html")
         self.assertIn("GP:", profile_template)
@@ -142,7 +163,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("GP в текущем ранге", profile_template)
 
     def test_key_pages_have_basic_html_shell(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html", "moderation.html", "admin-users.html"]
         for file_name in pages:
             html = self._read(file_name)
             self.assertIn("<body", html)

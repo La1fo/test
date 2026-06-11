@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Администраторы — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
+  <style>
+    .admin-users { display:grid; gap:10px; }
+    .admin-user-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px; border:1px solid #dcecff; border-radius:12px; background:#f8fcff; }
+    .admin-user-name { font-weight:800; color:#123d63; }
+    .admin-badge { display:inline-flex; margin-left:8px; padding:4px 8px; border-radius:999px; background:#e4f8ee; color:#137a4d; font-size:12px; font-weight:800; }
+    .admin-grant { border:0; border-radius:10px; padding:9px 12px; background:#0b67b2; color:#fff; cursor:pointer; font-weight:700; }
+    .admin-grant:disabled { background:#9db4c6; cursor:default; }
+    .admin-row-status { color:#2f5b80; font-size:13px; margin-top:4px; }
+  </style>
+</head>
+<body class="site-theme">
+  {% include "_nav.html" %}
+
+  <main class="page-shell">
+    <section class="surface-card">
+      <h1 class="page-title">Добавить администратора</h1>
+      {% if db_warning %}
+        <div class="warning">{{ db_warning }}</div>
+      {% endif %}
+      <p class="muted-text">Выберите пользователя из списка и выдайте ему права администратора.</p>
+
+      <div class="admin-users">
+        {% for user in admin_users %}
+        <div class="admin-user-row" id="admin-user-{{ user.user_id }}">
+          <div>
+            <div class="admin-user-name">@{{ user.username }}{% if user.is_admin %}<span class="admin-badge">Администратор</span>{% endif %}</div>
+            <div class="admin-row-status" role="status" aria-live="polite"></div>
+          </div>
+          <button class="admin-grant" type="button" data-user-id="{{ user.user_id }}" {% if user.is_admin %}disabled{% endif %}>
+            {% if user.is_admin %}Права уже выданы{% else %}Выдать права{% endif %}
+          </button>
+        </div>
+        {% endfor %}
+        {% if not admin_users %}
+          <div class="warning">Пользователи не найдены.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+
+  <script>
+    document.querySelectorAll('.admin-grant[data-user-id]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const row = button.closest('.admin-user-row');
+        const status = row.querySelector('.admin-row-status');
+        status.textContent = 'Выдаём права администратора...';
+        const response = await fetch(`/api/admin/users/${button.dataset.userId}/grant`, { method: 'POST' });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          status.textContent = data.detail || 'Не удалось выдать права';
+          return;
+        }
+        status.textContent = 'Права администратора выданы.';
+        button.textContent = 'Права уже выданы';
+        button.disabled = true;
+        const name = row.querySelector('.admin-user-name');
+        if (!name.querySelector('.admin-badge')) {
+          name.insertAdjacentHTML('beforeend', '<span class="admin-badge">Администратор</span>');
+        }
+      });
+    });
+  </script>
+  <!-- Jivo widget -->
+  <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
+</body>
+</html>

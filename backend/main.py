@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, HTTPException, Request
@@ -10,6 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
 from .api.auth import login_username, register_username_account
+from .add_location_service import resolve_photo_url
 from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_add_location_schema, ensure_auth_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
@@ -85,6 +86,34 @@ class ProfileRow:
     rank_name: str
     approved_locations: int
     gp_display: str
+
+
+@dataclass
+class ModerationPhoto:
+    url: str | None
+    original_name: str | None
+    mime_type: str | None
+    size_bytes: int | None
+
+
+@dataclass
+class PendingLocationRow:
+    location_id: int
+    name: str
+    description: str
+    latitude: float
+    longitude: float
+    username: str
+    user_id: int
+    tags: list[str] = field(default_factory=list)
+    photos: list[ModerationPhoto] = field(default_factory=list)
+
+
+@dataclass
+class AdminUserRow:
+    user_id: int
+    username: str
+    is_admin: bool
 
 
 def _site_rank_name(total_gp: int, position: int | None = None) -> str:
@@ -254,13 +283,162 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
         return None, f"Не удалось загрузить профиль: {exc}"
 
 
+
+def _user_is_admin(user_id: int | None) -> bool:
+    if user_id is None or DB_READ_ONLY:
+        return False
+    with get_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(is_admin, FALSE) FROM users WHERE id = %s LIMIT 1", (int(user_id),))
+            row = cur.fetchone()
+    return bool(row and row[0])
+
+
+def _require_admin(request: Request) -> int:
+    user_id = get_current_user_id(request, required=True)
+    if not _user_is_admin(user_id):
+        raise HTTPException(status_code=403, detail="Admin rights required")
+    return int(user_id)
+
+
+def _load_pending_locations() -> tuple[list[PendingLocationRow], str | None]:
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT l.id, l.name, l.description, l.latitude, l.longitude,
+                           l.user_id, COALESCE(u.username, 'Пользователь') AS username,
+                           COALESCE((
+                             SELECT string_agg(t.name, ', ' ORDER BY t.name)
+                             FROM location_tags lt
+                             JOIN tags t ON t.id = lt.tag_id
+                             WHERE lt.location_id = l.id
+                           ), '') AS tags,
+                           p.file_id, p.storage_type, p.storage_path, p.original_name, p.mime_type, p.size_bytes
+                    FROM locations l
+                    LEFT JOIN users u ON u.id = l.user_id
+                    LEFT JOIN photos p ON p.location_id = l.id
+                    WHERE l.status = 'pending'
+                    ORDER BY l.id DESC, p.order_index ASC NULLS LAST, p.id ASC NULLS LAST
+                    LIMIT 1000
+                    """
+                )
+                rows = cur.fetchall()
+
+        by_id: dict[int, PendingLocationRow] = {}
+        for row in rows:
+            (location_id, name, description, latitude, longitude, user_id, username, tags,
+             file_id, storage_type, storage_path, original_name, mime_type, size_bytes) = row
+            location_id = int(location_id)
+            item = by_id.get(location_id)
+            if item is None:
+                item = PendingLocationRow(
+                    location_id=location_id,
+                    name=name or "Без названия",
+                    description=description or "",
+                    latitude=float(latitude),
+                    longitude=float(longitude),
+                    user_id=int(user_id),
+                    username=(username or "Пользователь").lstrip("@"),
+                    tags=[tag.strip() for tag in (tags or "").split(",") if tag.strip()],
+                )
+                by_id[location_id] = item
+            photo_url = resolve_photo_url(file_id, storage_type, storage_path)
+            if photo_url:
+                item.photos.append(
+                    ModerationPhoto(
+                        url=photo_url,
+                        original_name=original_name,
+                        mime_type=mime_type,
+                        size_bytes=int(size_bytes) if size_bytes is not None else None,
+                    )
+                )
+
+        return list(by_id.values()), None
+    except Exception as exc:
+        return [], f"Не удалось загрузить локации на модерацию: {exc}"
+
+
+def _load_admin_users() -> tuple[list[AdminUserRow], str | None]:
+    try:
+        with get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, username, COALESCE(is_admin, FALSE)
+                    FROM users
+                    ORDER BY COALESCE(is_admin, FALSE) DESC, LOWER(username) ASC
+                    LIMIT 500
+                    """
+                )
+                rows = cur.fetchall()
+        return [
+            AdminUserRow(user_id=int(row[0]), username=(row[1] or "Пользователь").lstrip("@"), is_admin=bool(row[2]))
+            for row in rows
+        ], None
+    except Exception as exc:
+        return [], f"Не удалось загрузить пользователей: {exc}"
+
+
+def _set_location_moderation_status(location_id: int, status: str) -> None:
+    if DB_READ_ONLY:
+        raise HTTPException(status_code=503, detail="Moderation is disabled in read-only DB mode")
+    if status not in {"approved", "rejected"}:
+        raise HTTPException(status_code=400, detail="Unsupported moderation status")
+
+    with get_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT user_id, status FROM locations WHERE id = %s FOR UPDATE", (location_id,))
+                row = cur.fetchone()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="Location not found")
+                user_id, old_status = int(row[0]), row[1]
+                cur.execute("UPDATE locations SET status = %s WHERE id = %s", (status, location_id))
+                if old_status == 'pending':
+                    cur.execute(
+                        "UPDATE users SET moderation_locations = GREATEST(COALESCE(moderation_locations, 0) - 1, 0) WHERE id = %s",
+                        (user_id,),
+                    )
+                if status == 'approved' and old_status != 'approved':
+                    cur.execute("UPDATE users SET approved_locations = COALESCE(approved_locations, 0) + 1 WHERE id = %s", (user_id,))
+                if status == 'rejected' and old_status != 'rejected':
+                    cur.execute("UPDATE users SET rejected_locations = COALESCE(rejected_locations, 0) + 1 WHERE id = %s", (user_id,))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
+def _grant_admin(user_id: int) -> None:
+    if DB_READ_ONLY:
+        raise HTTPException(status_code=503, detail="Admin updates are disabled in read-only DB mode")
+    with get_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("UPDATE users SET is_admin = TRUE WHERE id = %s RETURNING id", (user_id,))
+                if cur.fetchone() is None:
+                    raise HTTPException(status_code=404, detail="User not found")
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
 def get_context(request: Request):
     current_user_id = get_current_user_id(request, required=False)
     current_path = getattr(getattr(request, "url", None), "path", "")
+    current_user_is_admin = False
+    if current_user_id is not None:
+        try:
+            current_user_is_admin = _user_is_admin(current_user_id)
+        except Exception:
+            current_user_is_admin = False
     return {
         "request": request,
-                "current_user_id": current_user_id,
+        "current_user_id": current_user_id,
         "is_authenticated": current_user_id is not None,
+        "current_user_is_admin": current_user_is_admin,
         "current_path": current_path,
     }
 
@@ -376,6 +554,77 @@ async def add_location_page(request: Request):
 async def map_page(request: Request):
     return templates.TemplateResponse("map.html", get_context(request))
 
+
+
+@app.get("/moderation", response_class=HTMLResponse)
+async def moderation_page(request: Request):
+    _require_admin(request)
+    context = get_context(request)
+    pending_locations, warning = _load_pending_locations()
+    context["pending_locations"] = pending_locations
+    context["db_warning"] = warning
+    return templates.TemplateResponse("moderation.html", context)
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+async def admin_users_page(request: Request):
+    _require_admin(request)
+    context = get_context(request)
+    users, warning = _load_admin_users()
+    context["admin_users"] = users
+    context["db_warning"] = warning
+    return templates.TemplateResponse("admin-users.html", context)
+
+
+@app.get("/api/admin/pending-locations")
+async def admin_pending_locations(request: Request):
+    _require_admin(request)
+    pending_locations, warning = _load_pending_locations()
+    return JSONResponse({
+        "locations": [
+            {
+                "id": item.location_id,
+                "name": item.name,
+                "description": item.description,
+                "latitude": item.latitude,
+                "longitude": item.longitude,
+                "user_id": item.user_id,
+                "username": item.username,
+                "tags": item.tags,
+                "photos": [photo.__dict__ for photo in item.photos],
+            }
+            for item in pending_locations
+        ],
+        "warning": warning,
+    })
+
+
+@app.post("/api/admin/locations/{location_id}/approve")
+async def approve_location(location_id: int, request: Request):
+    _require_admin(request)
+    _set_location_moderation_status(location_id, "approved")
+    return JSONResponse({"ok": True, "status": "approved"})
+
+
+@app.post("/api/admin/locations/{location_id}/reject")
+async def reject_location(location_id: int, request: Request):
+    _require_admin(request)
+    _set_location_moderation_status(location_id, "rejected")
+    return JSONResponse({"ok": True, "status": "rejected"})
+
+
+@app.get("/api/admin/users")
+async def admin_users(request: Request):
+    _require_admin(request)
+    users, warning = _load_admin_users()
+    return JSONResponse({"users": [user.__dict__ for user in users], "warning": warning})
+
+
+@app.post("/api/admin/users/{user_id}/grant")
+async def grant_admin(user_id: int, request: Request):
+    _require_admin(request)
+    _grant_admin(user_id)
+    return JSONResponse({"ok": True, "user_id": user_id, "is_admin": True})
 
 @app.get("/profile/me", response_class=HTMLResponse)
 async def my_profile_page(request: Request):
