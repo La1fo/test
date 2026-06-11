@@ -6,11 +6,15 @@ from backend import migrations
 
 
 class RecorderCursor:
-    def __init__(self):
+    def __init__(self, fetchone_result=None):
         self.calls = []
+        self.fetchone_result = fetchone_result
 
     def execute(self, query, params=None):
-        self.calls.append((" ".join(query.split()).lower(), params))
+        self.calls.append((" ".join(str(query).split()).lower(), params))
+
+    def fetchone(self):
+        return self.fetchone_result
 
     def __enter__(self):
         return self
@@ -85,7 +89,20 @@ class TestMigrationsTagCatalog(unittest.TestCase):
         queries = [q for q, _ in cursor.calls]
         self.assertTrue(any("alter table if exists users" in q for q in queries))
         self.assertTrue(any("idx_users_email_lower_unique" in q for q in queries))
-        self.assertTrue(any("create view %%i as" in q for q in queries))
+        self.assertTrue(any("from information_schema.views" in q for q in queries))
+        self.assertTrue(any('create view "public"."site_auth_users" as' in q for q in queries))
+
+
+class TestMigrationIdentifierHelpers(unittest.TestCase):
+    def test_split_relation_name_defaults_to_public_schema(self):
+        self.assertEqual(migrations._split_relation_name("site_auth_users"), ("public", "site_auth_users"))
+
+    def test_split_relation_name_accepts_explicit_schema(self):
+        self.assertEqual(migrations._split_relation_name("custom.site_auth_users"), ("custom", "site_auth_users"))
+
+    def test_split_relation_name_rejects_unsafe_identifier(self):
+        with self.assertRaises(ValueError):
+            migrations._split_relation_name("public.site_auth_users;DROP")
 
 
 if __name__ == "__main__":

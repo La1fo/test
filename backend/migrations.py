@@ -3,9 +3,39 @@
 Idempotent helpers for environments where write path is enabled.
 """
 
+import re
+
 from . import add_location_contract as contract
 from .database import get_db_contract
 from .database import get_connection
+
+
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _split_relation_name(relation_name: str) -> tuple[str, str]:
+    parts = [part.strip() for part in relation_name.split(".") if part.strip()]
+    if len(parts) == 1:
+        schema, table = "public", parts[0]
+    elif len(parts) == 2:
+        schema, table = parts
+    else:
+        raise ValueError(f"Invalid relation name: {relation_name!r}")
+
+    for part in (schema, table):
+        if not _IDENTIFIER_RE.fullmatch(part):
+            raise ValueError(f"Invalid SQL identifier: {part!r}")
+    return schema, table
+
+
+def _quote_identifier(identifier: str) -> str:
+    if not _IDENTIFIER_RE.fullmatch(identifier):
+        raise ValueError(f"Invalid SQL identifier: {identifier!r}")
+    return f'"{identifier}"'
+
+
+def _quote_relation(schema: str, table: str) -> str:
+    return f"{_quote_identifier(schema)}.{_quote_identifier(table)}"
 
 
 def ensure_add_location_schema() -> None:
@@ -92,27 +122,26 @@ def ensure_auth_schema() -> None:
                 WHERE email IS NOT NULL
                 """
             )
+            view_schema, view_name = _split_relation_name(contract_views.auth_users_view)
             cur.execute(
                 """
-                DO $$
-                BEGIN
-                  IF NOT EXISTS (
-                    SELECT 1 FROM information_schema.views
-                    WHERE table_schema='public' AND table_name=%s
-                  ) THEN
-                    EXECUTE format(
-                      'CREATE VIEW %%I AS
-                        SELECT u.id AS user_id,
-                               u.username,
-                               u.telegram_id,
-                               u.email,
-                               u.password_hash AS hashed_password
-                        FROM users u',
-                      %s
-                    );
-                  END IF;
-                END $$;
+                SELECT 1
+                FROM information_schema.views
+                WHERE table_schema = %s AND table_name = %s
+                LIMIT 1
                 """,
-                (contract_views.auth_users_view, contract_views.auth_users_view),
+                (view_schema, view_name),
             )
+            if cur.fetchone() is None:
+                cur.execute(
+                    f"""
+                    CREATE VIEW {_quote_relation(view_schema, view_name)} AS
+                    SELECT u.id AS user_id,
+                           u.username,
+                           u.telegram_id,
+                           u.email,
+                           u.password_hash AS hashed_password
+                    FROM users u
+                    """
+                )
         conn.commit()
