@@ -101,7 +101,7 @@ def ensure_auth_schema() -> None:
                     WHERE table_schema='public' AND table_name=%s
                   ) THEN
                     EXECUTE format(
-                      'CREATE VIEW %I AS
+                      'CREATE VIEW %%I AS
                         SELECT u.id AS user_id,
                                u.username,
                                u.telegram_id,

@@ -85,6 +85,7 @@ class TestMigrationsTagCatalog(unittest.TestCase):
         queries = [q for q, _ in cursor.calls]
         self.assertTrue(any("alter table if exists users" in q for q in queries))
         self.assertTrue(any("idx_users_email_lower_unique" in q for q in queries))
+        self.assertTrue(any("create view %%i as" in q for q in queries))
 
 
 if __name__ == "__main__":

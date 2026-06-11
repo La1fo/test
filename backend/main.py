@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -15,7 +16,14 @@ from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_curren
 
 load_dotenv()
 
-app = FastAPI(title="Frendly Map Website")
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    _ = app_instance
+    startup_contract_check()
+    yield
+
+
+app = FastAPI(title="Frendly Map Website", lifespan=lifespan)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -113,7 +121,6 @@ def _contract_healthcheck() -> str | None:
     return None
 
 
-@app.on_event("startup")
 def startup_contract_check() -> None:
     error = _contract_healthcheck()
     if error:
