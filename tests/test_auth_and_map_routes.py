@@ -25,37 +25,36 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         finally:
             main._load_profile = old_loader
 
-    def test_email_login_success_sets_cookie(self):
-        old_login = main.login_email
-        main.login_email = lambda email, password: {"user_id": 42}
+    def test_username_login_success_sets_cookie(self):
+        old_login = main.login_username
+        main.login_username = lambda username, password: {"user_id": 42}
         try:
             req = SimpleNamespace()
-            response = asyncio.run(main.login_email_page(req, email='a@b.c', password='x', next='/add-location'))
+            response = asyncio.run(main.login_username_page(req, username='friendly_user', password='x', next='/add-location'))
             self.assertEqual(response.status_code, 303)
             self.assertIn('set-cookie', response.headers)
         finally:
-            main.login_email = old_login
+            main.login_username = old_login
 
-    def test_email_login_failure_bubbles(self):
-        old_login = main.login_email
-        main.login_email = lambda email, password: (_ for _ in ()).throw(HTTPException(status_code=400, detail='bad'))
+    def test_username_login_failure_bubbles(self):
+        old_login = main.login_username
+        main.login_username = lambda username, password: (_ for _ in ()).throw(HTTPException(status_code=400, detail='bad'))
         try:
             with self.assertRaises(HTTPException):
-                asyncio.run(main.login_email_page(SimpleNamespace(), email='a', password='b', next='/'))
+                asyncio.run(main.login_username_page(SimpleNamespace(), username='a', password='b', next='/'))
         finally:
-            main.login_email = old_login
+            main.login_username = old_login
 
     def test_register_success_sets_cookie(self):
-        old_register = main.register_email_account
+        old_register = main.register_username_account
         old_ro = main.DB_READ_ONLY
-        main.register_email_account = lambda username, email, password: 123
+        main.register_username_account = lambda username, password: 123
         main.DB_READ_ONLY = False
         try:
             response = asyncio.run(
-                main.register_email_page(
+                main.register_username_page(
                     SimpleNamespace(),
                     username="user1",
-                    email="u@example.com",
                     password="secret123",
                     confirm_password="secret123",
                     next="/profile/me",
@@ -64,41 +63,39 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             self.assertEqual(response.status_code, 303)
             self.assertIn("set-cookie", response.headers)
         finally:
-            main.register_email_account = old_register
+            main.register_username_account = old_register
             main.DB_READ_ONLY = old_ro
 
     def test_register_password_mismatch(self):
         with self.assertRaises(HTTPException):
             asyncio.run(
-                main.register_email_page(
+                main.register_username_page(
                     SimpleNamespace(),
                     username="user1",
-                    email="u@example.com",
                     password="a",
                     confirm_password="b",
                     next="/profile/me",
                 )
             )
 
-    def test_register_invalid_email_bubbles(self):
-        old_register = main.register_email_account
+    def test_register_invalid_username_bubbles(self):
+        old_register = main.register_username_account
         old_ro = main.DB_READ_ONLY
         main.DB_READ_ONLY = False
-        main.register_email_account = lambda **kwargs: (_ for _ in ()).throw(HTTPException(status_code=400, detail="Invalid email format"))
+        main.register_username_account = lambda **kwargs: (_ for _ in ()).throw(HTTPException(status_code=400, detail="Username invalid"))
         try:
             with self.assertRaises(HTTPException):
                 asyncio.run(
-                    main.register_email_page(
+                    main.register_username_page(
                         SimpleNamespace(),
                         username="user1",
-                        email="bad",
                         password="secret123",
                         confirm_password="secret123",
                         next="/profile/me",
                     )
                 )
         finally:
-            main.register_email_account = old_register
+            main.register_username_account = old_register
             main.DB_READ_ONLY = old_ro
 
     def test_register_blocked_in_read_only_mode(self):
@@ -107,10 +104,9 @@ class TestAuthAndMapRoutes(unittest.TestCase):
         try:
             with self.assertRaises(HTTPException):
                 asyncio.run(
-                    main.register_email_page(
+                    main.register_username_page(
                         SimpleNamespace(),
                         username="user1",
-                        email="u@example.com",
                         password="secret123",
                         confirm_password="secret123",
                         next="/profile/me",

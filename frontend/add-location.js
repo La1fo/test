@@ -22,15 +22,37 @@
   let pickerMap = null;
   let marker = null;
 
+  function formatApiError(detail, fallback) {
+    if (!detail) return fallback;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map((item) => item?.msg || item?.message || item?.detail || JSON.stringify(item))
+        .join('; ');
+    }
+    return detail.msg || detail.message || detail.detail || fallback;
+  }
+
+  async function readJson(response) {
+    try {
+      return await response.json();
+    } catch (_) {
+      return {};
+    }
+  }
+
   function setStatus(text, isError = false) {
-    statusBox.textContent = text;
+    statusBox.textContent = typeof text === 'string' ? text : formatApiError(text, 'Произошла ошибка');
     statusBox.classList.toggle('error', isError);
   }
 
 
   async function loadConfig() {
     const res = await fetch('/api/add-location/form-config');
-    const cfg = await res.json();
+    const cfg = await readJson(res);
+    if (!res.ok) {
+      throw new Error(formatApiError(cfg.detail, 'Не удалось загрузить конфигурацию формы'));
+    }
 
     state.tagCatalog = cfg.tag_catalog || [];
     state.maxTags = cfg.max_tags || 5;
@@ -161,9 +183,9 @@
       body: JSON.stringify({ files: encodedFiles }),
     });
 
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) {
-      setStatus(data?.detail || 'Ошибка загрузки фото', true);
+      setStatus(formatApiError(data?.detail, 'Ошибка загрузки фото'), true);
       return;
     }
 
@@ -231,10 +253,10 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await readJson(res);
 
     if (!res.ok) {
-      setStatus(data?.detail || 'Ошибка preview', true);
+      setStatus(formatApiError(data?.detail, 'Ошибка preview'), true);
       return;
     }
 
@@ -262,10 +284,10 @@
       },
       body: JSON.stringify(submitPayload),
     });
-    const data = await res.json();
+    const data = await readJson(res);
 
     if (!res.ok) {
-      setStatus(data?.detail || 'Не удалось отправить локацию', true);
+      setStatus(formatApiError(data?.detail, 'Не удалось отправить локацию'), true);
       return;
     }
 
@@ -281,5 +303,5 @@
   });
 
   initMapPicker();
-  loadConfig().catch(() => setStatus('Не удалось загрузить конфигурацию формы', true));
+  loadConfig().catch((error) => setStatus(error.message || 'Не удалось загрузить конфигурацию формы', true));
 })();

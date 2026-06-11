@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Регистрация — Frendly Map</title>
+  <link rel="stylesheet" href="/static/page-theme.css" />
+</head>
+<body class="site-theme auth-theme">
+  {% include "_nav.html" %}
+
+  <main class="auth-shell">
+    <section class="auth-card auth-card-wide">
+      <div class="auth-badge">Новый аккаунт</div>
+      <h1 class="auth-title">Создайте профиль</h1>
+      <p class="auth-subtitle">Нужны только username и пароль. Почта больше не запрашивается.</p>
+
+      <form id="registerForm" class="auth-form" autocomplete="on">
+        <label class="auth-field" for="regUsername">
+          <span>Имя пользователя</span>
+          <input id="regUsername" name="username" autocomplete="username" minlength="3" maxlength="50" placeholder="friendly_user" required />
+        </label>
+        <label class="auth-field" for="regPassword">
+          <span>Пароль</span>
+          <input id="regPassword" name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="Минимум 8 символов" required />
+        </label>
+        <label class="auth-field" for="regPasswordConfirm">
+          <span>Повторите пароль</span>
+          <input id="regPasswordConfirm" name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="Повторите пароль" required />
+        </label>
+        <button class="auth-submit" id="registerBtn" type="submit">Зарегистрироваться</button>
+      </form>
+
+      <div id="status" class="auth-status" role="status" aria-live="polite"></div>
+
+      <p class="auth-switch">
+        Уже есть аккаунт?
+        <a id="loginLink" href="/login">Войти</a>
+      </p>
+    </section>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next') || '/profile/me';
+    const status = document.getElementById('status');
+    const loginLink = document.getElementById('loginLink');
+    loginLink.href = `/login?next=${encodeURIComponent(next)}`;
+
+    function formatError(detail, fallback) {
+      if (!detail) return fallback;
+      if (typeof detail === 'string') return detail;
+      if (Array.isArray(detail)) {
+        return detail.map((item) => item?.msg || item?.message || JSON.stringify(item)).join('; ');
+      }
+      return detail.msg || detail.message || fallback;
+    }
+
+    async function readJson(response) {
+      try { return await response.json(); } catch (_) { return {}; }
+    }
+
+    async function register(event) {
+      event.preventDefault();
+      status.textContent = 'Создаём профиль…';
+      status.classList.remove('error');
+
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const confirm_password = document.getElementById('regPasswordConfirm').value;
+      const res = await fetch('/api/session/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, confirm_password, next }),
+      });
+
+      if (res.ok) {
+        window.location.href = next;
+        return;
+      }
+
+      const data = await readJson(res);
+      status.textContent = formatError(data.detail, 'Ошибка регистрации');
+      status.classList.add('error');
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', register);
+  </script>
+  <!-- Jivo widget -->
+  <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>
+</body>
+</html>
