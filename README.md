@@ -1,6 +1,6 @@
 # FriendlyMap Site
 
-Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию. В write-mode сайт сам создаёт и обновляет нужные таблицы, индексы, справочники и `site_*` VIEW при запуске.
+Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию. По умолчанию сайт работает в write-mode и сам создаёт/обновляет нужные таблицы, индексы, справочники и `site_*` VIEW при запуске.
 
 ## Обязательный DB contract (VIEW)
 Сайт ожидает в `public` следующие VIEW:
@@ -77,7 +77,7 @@
    ```bash
    python3 -m backend.init_db
    ```
-   При `DB_READ_ONLY=0` команда создаст/обновит таблицы сайта, заполнит каталог тегов и пересоздаст контрактные `site_*` VIEW, затем проверит контракт. При `DB_READ_ONLY=1` команда только проверяет заранее подготовленный контракт.
+   При `DB_BOOTSTRAP_SCHEMA=1` команда создаст/обновит таблицы сайта, заполнит каталог тегов и пересоздаст контрактные `site_*` VIEW, затем проверит контракт. Для полностью read-only окружения установите `DB_BOOTSTRAP_SCHEMA=0` и заранее подготовьте контрактные VIEW.
 5. Запустить сайт:
    ```bash
    python3 -m backend.main
@@ -121,7 +121,8 @@
 - `/add-location` для гостя показывает auth-required CTA; `/map` для гостя доступна для просмотра и показывает login CTA.
 
 ## Runtime требования для write-mode
-- `DB_READ_ONLY=0`
+- `DB_READ_ONLY=0` — включает регистрацию и отправку локаций (значение по умолчанию).
+- `DB_BOOTSTRAP_SCHEMA=1` — создаёт/обновляет таблицы и `site_*` VIEW при запуске и в `python3 -m backend.init_db` (значение по умолчанию).
 - `SECRET_KEY` задан (подпись session-cookie)
 - `MEDIA_ROOT` доступен на запись
 - write-права к `users`, `locations`, `photos`, `tags`, `location_tags`, `achievements`, `user_achievements`, `site_submission_idempotency` и права на соответствующие sequence
@@ -132,7 +133,7 @@
 - `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
 
 ## Миграции
-В write-mode (`DB_READ_ONLY=0`) на старте вызывается `ensure_site_schema()`:
+Если `DB_BOOTSTRAP_SCHEMA=1`, на старте вызывается `ensure_site_schema()` до проверки DB contract:
 - `ensure_core_schema()` создаёт базовые таблицы сайта: `users`, `locations`, `photos`, `tags`, `location_tags`, `achievements`, `user_achievements`; для частично существующих таблиц добавляет недостающие колонки и индексы.
 - `ensure_add_location_schema()` добавляет web-photo колонки в `photos`, создаёт `site_submission_idempotency`, создаёт/синхронизирует `tags` и полный FriendlyMap tag catalog.
 - `ensure_auth_schema()` добавляет auth/profile поля в `users` (`email`, `password_hash`, `email_verified`, и др.) и создаёт уникальный индекс `LOWER(email)`.
@@ -140,7 +141,4 @@
 
 После миграций приложение всегда запускает проверку DB contract, поэтому если VIEW не соответствуют ожиданиям, сайт останавливается с понятной ошибкой.
 
-При `DB_READ_ONLY=1`:
-- registration отключена,
-- add-location upload/submit отключены,
-- публичные reader routes и карта остаются доступными.
+При `DB_READ_ONLY=1` registration и add-location upload/submit отключаются, но при `DB_BOOTSTRAP_SCHEMA=1` приложение всё равно попытается подготовить схему перед проверкой контракта. Для роли без write-прав установите `DB_BOOTSTRAP_SCHEMA=0`; тогда публичные reader routes и карта будут доступны только при заранее созданных `site_*` VIEW.

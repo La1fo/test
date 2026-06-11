@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
 from .api.auth import login_email, register_email_account
-from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
+from .database import DB_BOOTSTRAP_SCHEMA, DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_site_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
 
@@ -115,7 +115,7 @@ def _contract_healthcheck() -> str | None:
 
 @app.on_event("startup")
 def startup_contract_check() -> None:
-    if not DB_READ_ONLY:
+    if DB_BOOTSTRAP_SCHEMA:
         ensure_site_schema()
 
     error = _contract_healthcheck()

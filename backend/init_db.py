@@ -16,7 +16,7 @@ def _safe_db_url(db_url: str) -> str:
 
 def main() -> int:
     try:
-        from .database import DATABASE_DSN, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
+        from .database import DATABASE_DSN, DB_BOOTSTRAP_SCHEMA, DB_READ_ONLY, LEGACY_SCHEMA_COMPAT, get_db_contract, validate_db_contract
         from .migrations import ensure_site_schema
     except ModuleNotFoundError as exc:
         print("❌ Не хватает Python-зависимостей для запуска init_db.")
@@ -28,6 +28,7 @@ def main() -> int:
     contract = get_db_contract()
     print(f"Используем БД: {_safe_db_url(DATABASE_DSN)}")
     print(f"Режим БД: {'read-only' if DB_READ_ONLY else 'read-write'}")
+    print(f"Автосоздание схемы: {'on' if DB_BOOTSTRAP_SCHEMA else 'off'}")
     print(f"Schema mode: {'legacy-compat' if LEGACY_SCHEMA_COMPAT else 'strict-contract'}")
     print(f"Legacy compatibility: {'on' if LEGACY_SCHEMA_COMPAT else 'off'}")
     print("Ожидаемые VIEW контракта:")
@@ -38,7 +39,7 @@ def main() -> int:
     print(f"- auth_users: {contract.auth_users_view}")
 
     try:
-        if not DB_READ_ONLY:
+        if DB_BOOTSTRAP_SCHEMA:
             print("Создаём/обновляем таблицы и VIEW сайта...")
             ensure_site_schema()
 
