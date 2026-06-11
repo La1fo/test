@@ -96,6 +96,7 @@
 ## Auth и session
 - `POST /api/session/register` создаёт запись в `users` (`email`, `password_hash`, профильные defaults) и сразу ставит signed cookie `fm_session`.
 - `POST /api/session/email` логинит по `site_auth_users.email` + `hashed_password`.
+- `POST /api/session/telegram` проверяет подпись Telegram Login Widget через `TELEGRAM_BOT_TOKEN`, создаёт/находит пользователя по `telegram_id` и ставит signed cookie.
 - `GET /api/session/me` возвращает `{ authenticated, user_id }`.
 - Navbar единый на всех страницах: guest видит `Войти`, auth user видит `Мой профиль`; `Выйти` доступен на странице профиля.
 
@@ -129,6 +130,8 @@
 
 ### Auth / session env vars
 - `SECRET_KEY` — обязателен для подписи web cookie-сессий.
+- `TELEGRAM_BOT_USERNAME` — username бота для Telegram Login Widget без `@`.
+- `TELEGRAM_BOT_TOKEN` — токен бота для серверной проверки подписи Telegram Login Widget; храните только в `.env`/секретах окружения и не публикуйте.
 - `SESSION_TTL_SECONDS` — TTL cookie-сессии (по умолчанию 86400 секунд).
 - `SESSION_COOKIE_SECURE=1` — включить secure-cookie за reverse proxy + HTTPS.
 

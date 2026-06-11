@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
-from .api.auth import login_email, register_email_account
+from .api.auth import login_email, login_telegram_account, register_email_account
 from .database import DB_BOOTSTRAP_SCHEMA, DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_site_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
@@ -250,11 +250,15 @@ def _load_profile(user_id: int) -> tuple[ProfileRow | None, str | None]:
 def get_context(request: Request):
     current_user_id = get_current_user_id(request, required=False)
     current_path = getattr(getattr(request, "url", None), "path", "")
+    telegram_bot_username = os.getenv("TELEGRAM_BOT_USERNAME", "").strip()
+    telegram_bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
     return {
         "request": request,
-                "current_user_id": current_user_id,
+        "current_user_id": current_user_id,
         "is_authenticated": current_user_id is not None,
         "current_path": current_path,
+        "telegram_bot_username": telegram_bot_username,
+        "telegram_login_enabled": bool(telegram_bot_username and telegram_bot_token),
     }
 
 
@@ -293,6 +297,15 @@ async def login_email_page(request: Request, email: str = Body(...), password: s
     result = login_email(email=email, password=password)
     response = RedirectResponse(url=_normalize_next(next), status_code=303)
     _set_session_cookie(response, int(result["user_id"]))
+    return response
+
+
+@app.post("/api/session/telegram")
+async def login_telegram_page(request: Request, auth_data: dict = Body(...)):
+    _ = request
+    user_id = login_telegram_account(auth_data)
+    response = RedirectResponse(url=_normalize_next(str(auth_data.get("next") or "/profile/me"), default="/profile/me"), status_code=303)
+    _set_session_cookie(response, int(user_id))
     return response
 
 

@@ -13,6 +13,17 @@
     <section class="surface-card" style="max-width:560px;">
       <h1 class="page-title">Вход</h1>
       <p class="muted-text">Авторизуйтесь или создайте аккаунт на сайте.</p>
+
+      {% if telegram_login_enabled %}
+        <div class="telegram-login-box">
+          <p class="muted-text">Быстрый вход через Telegram</p>
+          <div id="telegramLoginWidget"></div>
+        </div>
+        <hr style="margin:16px 0;">
+      {% else %}
+        <div class="warning">Вход через Telegram не настроен: задайте TELEGRAM_BOT_USERNAME и TELEGRAM_BOT_TOKEN.</div>
+      {% endif %}
+
       <div class="field"><input id="email" type="email" placeholder="Email"></div>
       <div class="field"><input id="password" type="password" placeholder="Пароль"></div>
       <button class="btn-primary" id="emailLoginBtn" type="button">Войти по email</button>
@@ -45,6 +56,28 @@
       else status.textContent = (await res.json()).detail || 'Ошибка входа';
     }
 
+
+    async function onTelegramAuth(user) {
+      const res = await fetch('/api/session/telegram', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({...user, next}),
+      });
+      if (res.ok) window.location.href = next || '/profile/me';
+      else status.textContent = (await res.json()).detail || 'Ошибка входа через Telegram';
+    }
+    window.onTelegramAuth = onTelegramAuth;
+
+    {% if telegram_login_enabled %}
+      const telegramScript = document.createElement('script');
+      telegramScript.src = 'https://telegram.org/js/telegram-widget.js?22';
+      telegramScript.async = true;
+      telegramScript.setAttribute('data-telegram-login', '{{ telegram_bot_username }}');
+      telegramScript.setAttribute('data-size', 'large');
+      telegramScript.setAttribute('data-radius', '12');
+      telegramScript.setAttribute('data-request-access', 'write');
+      telegramScript.setAttribute('data-onauth', 'onTelegramAuth(user)');
+      document.getElementById('telegramLoginWidget').appendChild(telegramScript);
+    {% endif %}
 
     async function registerViaEmail() {
       const username = document.getElementById('regUsername').value.trim();

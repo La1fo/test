@@ -22,24 +22,27 @@
 
     .top-nav {
       background: rgba(255, 255, 255, 0.9);
-      padding: 14px 30px;
-      border-radius: 50px;
+      padding: 14px 24px;
+      border-radius: 32px;
       display: flex;
       justify-content: center;
-      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px 12px;
       box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       margin: 40px auto 88px;
-      width: 100%;
-      max-width: 700px;
+      width: min(100%, 1120px);
+      max-width: calc(100vw - 40px);
       z-index: 10;
     }
 
     .top-nav a {
-      padding: 8px 16px;
+      padding: 8px 14px;
       text-decoration: none;
       color: #0077cc;
       font-weight: 600;
-      font-size: 1.15rem;
+      font-size: 1.05rem;
+      white-space: nowrap;
       border-radius: 30px;
       transition: all 0.2s ease;
     }
@@ -112,6 +115,22 @@
       background: #1a7bd8;
       transform: translateY(-2px);
       box-shadow: 0 12px 28px rgba(41, 151, 245, 0.55);
+    }
+
+    @media (max-width: 768px) {
+      .top-nav {
+        max-width: calc(100vw - 24px);
+        gap: 8px;
+        padding: 12px;
+        border-radius: 18px;
+        margin-top: 20px;
+        margin-bottom: 48px;
+      }
+
+      .top-nav a {
+        font-size: 1rem;
+        padding: 8px 12px;
+      }
     }
 
     @keyframes fadeUp {

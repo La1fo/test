@@ -120,9 +120,24 @@ class TestAuthAndMapRoutes(unittest.TestCase):
             main.DB_READ_ONLY = old_ro
 
 
-    def test_standalone_site_has_no_telegram_session_route(self):
+    def test_telegram_login_success_sets_cookie(self):
+        old_login = main.login_telegram_account
+        main.login_telegram_account = lambda auth_data: 314
+        try:
+            response = asyncio.run(
+                main.login_telegram_page(
+                    SimpleNamespace(),
+                    auth_data={"id": 777, "auth_date": 123, "hash": "signed", "next": "/profile/me"},
+                )
+            )
+            self.assertEqual(response.status_code, 303)
+            self.assertIn("set-cookie", response.headers)
+        finally:
+            main.login_telegram_account = old_login
+
+    def test_has_telegram_session_route(self):
         paths = {route.path for route in main.app.routes}
-        self.assertNotIn("/api/session/telegram", paths)
+        self.assertIn("/api/session/telegram", paths)
 
     def test_map_route_renders(self):
         req = SimpleNamespace(cookies={})

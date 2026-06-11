@@ -231,5 +231,52 @@ class TestAuthUsesAuthUsersView(unittest.TestCase):
 
 
 
+class TestTelegramAuthHelpers(unittest.TestCase):
+    def _signed_payload(self, token: str, payload: dict[str, object]) -> dict[str, object]:
+        import hashlib
+        import hmac
+
+        data_check_string = "\n".join(f"{key}={payload[key]}" for key in sorted(payload))
+        secret_key = hashlib.sha256(token.encode()).digest()
+        signed = dict(payload)
+        signed["hash"] = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        return signed
+
+    def test_telegram_auth_verifies_signature_and_ignores_next(self):
+        import os
+        import time
+
+        old_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        os.environ["TELEGRAM_BOT_TOKEN"] = "123456:ABC"
+        payload = {"id": 777, "username": "map_user", "auth_date": int(time.time())}
+        signed = self._signed_payload(os.environ["TELEGRAM_BOT_TOKEN"], payload)
+        signed["next"] = "/profile/me"
+        try:
+            verified = auth._verify_telegram_auth(signed)
+            self.assertEqual(verified["id"], "777")
+            self.assertNotIn("next", verified)
+        finally:
+            if old_token is None:
+                os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+            else:
+                os.environ["TELEGRAM_BOT_TOKEN"] = old_token
+
+    def test_telegram_auth_rejects_bad_signature(self):
+        import os
+        import time
+
+        old_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        os.environ["TELEGRAM_BOT_TOKEN"] = "123456:ABC"
+        try:
+            with self.assertRaises(HTTPException):
+                auth._verify_telegram_auth({"id": 777, "auth_date": int(time.time()), "hash": "bad"})
+        finally:
+            if old_token is None:
+                os.environ.pop("TELEGRAM_BOT_TOKEN", None)
+            else:
+                os.environ["TELEGRAM_BOT_TOKEN"] = old_token
+
+
+
 if __name__ == "__main__":
     unittest.main()

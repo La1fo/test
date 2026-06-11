@@ -42,13 +42,14 @@ class TestTemplates(unittest.TestCase):
         self.assertIn('href="/add-location"', nav)
         self.assertIn('href="/map"', nav)
 
-    def test_login_page_has_registration_block(self):
+    def test_login_page_has_registration_and_telegram_blocks(self):
         login = self._read("login.html")
         self.assertIn("Регистрация", login)
         self.assertIn("regUsername", login)
         self.assertIn("/api/session/register", login)
-        self.assertNotIn("Telegram", login)
-        self.assertNotIn("/api/session/telegram", login)
+        self.assertIn("Быстрый вход через Telegram", login)
+        self.assertIn("/api/session/telegram", login)
+        self.assertIn("telegram-widget.js", login)
 
     def test_logout_available_on_profile_page_only(self):
         profile = self._read("profile.html")
