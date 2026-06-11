@@ -50,7 +50,8 @@ def _build_postgres_dsn() -> str:
 
 
 DATABASE_DSN = _build_postgres_dsn()
-DB_READ_ONLY = _bool_env("DB_READ_ONLY", True)
+DB_READ_ONLY = _bool_env("DB_READ_ONLY", False)
+DB_BOOTSTRAP_SCHEMA = _bool_env("DB_BOOTSTRAP_SCHEMA", True)
 LEGACY_SCHEMA_COMPAT = _bool_env("LEGACY_SCHEMA_COMPAT", False)
 
 

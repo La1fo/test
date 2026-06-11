@@ -25,25 +25,28 @@ body.site-theme {
 
 .top-nav {
   background: var(--fm-nav-bg);
-  padding: 14px 30px;
-  border-radius: 50px;
+  padding: 14px 24px;
+  border-radius: 32px;
   display: flex;
   justify-content: center;
-  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 12px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
   margin: 40px auto 56px;
-  width: 100%;
-  max-width: 700px;
+  width: min(100%, 1120px);
+  max-width: calc(100vw - 40px);
   z-index: 10;
 }
 
 .top-nav a {
   text-decoration: none;
   color: #0077cc;
-  padding: 8px 16px;
+  padding: 8px 14px;
   border-radius: 30px;
   font-weight: 600;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
+  white-space: nowrap;
   transition: all 0.2s ease;
 }
 
@@ -103,12 +106,12 @@ body.site-theme {
 
 @media (max-width: 768px) {
   .top-nav {
-    max-width: 100%;
+    max-width: calc(100vw - 24px);
     gap: 8px;
     padding: 12px;
     border-radius: 18px;
+    margin-top: 20px;
     margin-bottom: 30px;
-    flex-wrap: wrap;
   }
 
   .top-nav a {
@@ -121,6 +124,17 @@ body.site-theme {
   }
 }
 
+
+.telegram-login-box {
+  text-align: center;
+  margin: 10px 0 4px;
+}
+
+#telegramLoginWidget {
+  display: flex;
+  justify-content: center;
+  min-height: 48px;
+}
 
 .interactive-toggle {
   background: #f5f9ff;

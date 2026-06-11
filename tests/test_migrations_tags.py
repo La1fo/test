@@ -86,6 +86,54 @@ class TestMigrationsTagCatalog(unittest.TestCase):
         self.assertTrue(any("alter table if exists users" in q for q in queries))
         self.assertTrue(any("idx_users_email_lower_unique" in q for q in queries))
 
+    def test_ensure_site_schema_creates_core_tables_and_contract_views(self):
+        cursor = RecorderCursor()
+
+        @contextmanager
+        def fake_conn(dict_cursor=False):
+            _ = dict_cursor
+            yield RecorderConn(cursor)
+
+        old_conn = migrations.get_connection
+        old_contract = migrations.get_db_contract
+        migrations.get_connection = fake_conn
+        migrations.get_db_contract = lambda: type(
+            "Contract",
+            (),
+            {
+                "public_users_view": "site_public_users",
+                "leaderboard_view": "site_leaderboard",
+                "public_locations_view": "site_public_locations",
+                "achievements_view": "site_achievements_overview",
+                "auth_users_view": "site_auth_users",
+            },
+        )()
+        try:
+            migrations.ensure_site_schema()
+        finally:
+            migrations.get_connection = old_conn
+            migrations.get_db_contract = old_contract
+
+        queries = [q for q, _ in cursor.calls]
+        for table in (
+            "users",
+            "locations",
+            "photos",
+            "tags",
+            "location_tags",
+            "achievements",
+            "user_achievements",
+        ):
+            self.assertTrue(any(f"create table if not exists {table}" in q for q in queries))
+        for view in (
+            "site_public_users",
+            "site_leaderboard",
+            "site_public_locations",
+            "site_achievements_overview",
+            "site_auth_users",
+        ):
+            self.assertTrue(any(f"create or replace view {view}" in q for q in queries))
+
 
 if __name__ == "__main__":
     unittest.main()
