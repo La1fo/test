@@ -1,4 +1,5 @@
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from dotenv import load_dotenv
@@ -8,14 +9,21 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .api import add_location, map as map_api
-from .api.auth import login_email, register_email_account
+from .api.auth import login_username, register_username_account
 from .database import DB_READ_ONLY, get_connection, get_db_contract, validate_db_contract
 from .migrations import ensure_add_location_schema, ensure_auth_schema
 from .session_auth import SESSION_COOKIE_NAME, create_session_cookie, get_current_user_id
 
 load_dotenv()
 
-app = FastAPI(title="Frendly Map Website")
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    _ = app_instance
+    startup_contract_check()
+    yield
+
+
+app = FastAPI(title="Frendly Map Website", lifespan=lifespan)
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
@@ -113,7 +121,6 @@ def _contract_healthcheck() -> str | None:
     return None
 
 
-@app.on_event("startup")
 def startup_contract_check() -> None:
     error = _contract_healthcheck()
     if error:
@@ -285,22 +292,26 @@ async def login_page(request: Request):
     return templates.TemplateResponse("login.html", get_context(request))
 
 
-@app.post("/api/session/email")
-async def login_email_page(request: Request, email: str = Body(...), password: str = Body(...), next: str = Body("/")):
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request):
+    return templates.TemplateResponse("register.html", get_context(request))
+
+
+@app.post("/api/session/login")
+async def login_username_page(request: Request, username: str = Body(...), password: str = Body(...), next: str = Body("/")):
     _ = request
-    if not email.strip() or not password:
-        raise HTTPException(status_code=400, detail="Email and password are required")
-    result = login_email(email=email, password=password)
+    if not username.strip() or not password:
+        raise HTTPException(status_code=400, detail="Username and password are required")
+    result = login_username(username=username, password=password)
     response = RedirectResponse(url=_normalize_next(next), status_code=303)
     _set_session_cookie(response, int(result["user_id"]))
     return response
 
 
 @app.post("/api/session/register")
-async def register_email_page(
+async def register_username_page(
     request: Request,
     username: str = Body(...),
-    email: str = Body(...),
     password: str = Body(...),
     confirm_password: str = Body(...),
     next: str = Body("/profile/me"),
@@ -310,7 +321,7 @@ async def register_email_page(
         raise HTTPException(status_code=503, detail="Registration disabled in read-only DB mode")
     if password != confirm_password:
         raise HTTPException(status_code=400, detail="Password confirmation does not match")
-    user_id = register_email_account(username=username, email=email, password=password)
+    user_id = register_username_account(username=username, password=password)
     response = RedirectResponse(url=_normalize_next(next, default="/profile/me"), status_code=303)
     _set_session_cookie(response, int(user_id))
     return response

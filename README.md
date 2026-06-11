@@ -1,6 +1,6 @@
 # FriendlyMap Site
 
-Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по email, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию.
+Сайт работает как самостоятельный веб-сервис FriendlyMap: пользователи регистрируются по username без запроса почты, входят через cookie-сессию, смотрят карту подтверждённых локаций и отправляют новые точки на модерацию.
 
 ## Обязательный DB contract (VIEW)
 Сайт ожидает в `public` следующие VIEW:
@@ -89,12 +89,13 @@
 - `/achievements` → `site_achievements_overview`
 - `/add-location` → web add-location flow
 - `/map` → карта подтверждённых локаций
-- `/login` → email login + email registration
+- `/login` → отдельная страница входа по username
+- `/register` → отдельная страница регистрации по username без email
 - `/logout` → выход из cookie-сессии
 
 ## Auth и session
-- `POST /api/session/register` создаёт запись в `users` (`email`, `password_hash`, профильные defaults) и сразу ставит signed cookie `fm_session`.
-- `POST /api/session/email` логинит по `site_auth_users.email` + `hashed_password`.
+- `POST /api/session/register` создаёт запись в `users` (`username`, `password_hash`, профильные defaults) без запроса email и сразу ставит signed cookie `fm_session`.
+- `POST /api/session/login` логинит по `site_auth_users.username` + `hashed_password`.
 - `GET /api/session/me` возвращает `{ authenticated, user_id }`.
 - Navbar единый на всех страницах: guest видит `Войти`, auth user видит `Мой профиль`; `Выйти` доступен на странице профиля.
 

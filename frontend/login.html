@@ -6,61 +6,80 @@
   <title>Вход — Frendly Map</title>
   <link rel="stylesheet" href="/static/page-theme.css" />
 </head>
-<body class="site-theme">
+<body class="site-theme auth-theme">
   {% include "_nav.html" %}
 
-  <main class="page-shell">
-    <section class="surface-card" style="max-width:560px;">
-      <h1 class="page-title">Вход</h1>
-      <p class="muted-text">Авторизуйтесь или создайте аккаунт на сайте.</p>
-      <div class="field"><input id="email" type="email" placeholder="Email"></div>
-      <div class="field"><input id="password" type="password" placeholder="Пароль"></div>
-      <button class="btn-primary" id="emailLoginBtn" type="button">Войти по email</button>
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-badge">FriendlyMap ID</div>
+      <h1 class="auth-title">Добро пожаловать</h1>
+      <p class="auth-subtitle">Войдите по имени пользователя — без запроса почты и лишних шагов.</p>
 
-      <hr style="margin:16px 0;">
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <label class="auth-field" for="username">
+          <span>Имя пользователя</span>
+          <input id="username" name="username" autocomplete="username" placeholder="например, friendly_user" required />
+        </label>
+        <label class="auth-field" for="password">
+          <span>Пароль</span>
+          <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Введите пароль" required />
+        </label>
+        <button class="auth-submit" id="loginBtn" type="submit">Войти</button>
+      </form>
 
-      <h2 style="font-size:20px;margin:0 0 8px;">Регистрация</h2>
-      <div class="field"><input id="regUsername" placeholder="Username"></div>
-      <div class="field"><input id="regEmail" type="email" placeholder="Email"></div>
-      <div class="field"><input id="regPassword" type="password" placeholder="Пароль"></div>
-      <div class="field"><input id="regPasswordConfirm" type="password" placeholder="Подтвердите пароль"></div>
-      <button class="btn-primary" id="registerBtn" type="button">Зарегистрироваться</button>
+      <div id="status" class="auth-status" role="status" aria-live="polite"></div>
 
-      <div id="status" class="status"></div>
+      <p class="auth-switch">
+        Ещё нет аккаунта?
+        <a id="registerLink" href="/register">Создать профиль</a>
+      </p>
     </section>
   </main>
 
   <script>
-    const next = new URLSearchParams(window.location.search).get('next') || '/';
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next') || '/';
     const status = document.getElementById('status');
+    const registerLink = document.getElementById('registerLink');
+    registerLink.href = `/register?next=${encodeURIComponent(next)}`;
 
-    async function loginViaEmail() {
-      const email = document.getElementById('email').value.trim();
+    function formatError(detail, fallback) {
+      if (!detail) return fallback;
+      if (typeof detail === 'string') return detail;
+      if (Array.isArray(detail)) {
+        return detail.map((item) => item?.msg || item?.message || JSON.stringify(item)).join('; ');
+      }
+      return detail.msg || detail.message || fallback;
+    }
+
+    async function readJson(response) {
+      try { return await response.json(); } catch (_) { return {}; }
+    }
+
+    async function login(event) {
+      event.preventDefault();
+      status.textContent = 'Проверяем данные…';
+      status.classList.remove('error');
+
+      const username = document.getElementById('username').value.trim();
       const password = document.getElementById('password').value;
-      const res = await fetch('/api/session/email', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({email, password, next}),
+      const res = await fetch('/api/session/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password, next }),
       });
-      if (res.ok) window.location.href = next;
-      else status.textContent = (await res.json()).detail || 'Ошибка входа';
+
+      if (res.ok) {
+        window.location.href = next;
+        return;
+      }
+
+      const data = await readJson(res);
+      status.textContent = formatError(data.detail, 'Не удалось войти');
+      status.classList.add('error');
     }
 
-
-    async function registerViaEmail() {
-      const username = document.getElementById('regUsername').value.trim();
-      const email = document.getElementById('regEmail').value.trim();
-      const password = document.getElementById('regPassword').value;
-      const confirm_password = document.getElementById('regPasswordConfirm').value;
-      const res = await fetch('/api/session/register', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({username, email, password, confirm_password, next}),
-      });
-      if (res.ok) window.location.href = next || '/profile/me';
-      else status.textContent = (await res.json()).detail || 'Ошибка регистрации';
-    }
-
-    document.getElementById('emailLoginBtn').addEventListener('click', loginViaEmail);
-    document.getElementById('registerBtn').addEventListener('click', registerViaEmail);
+    document.getElementById('loginForm').addEventListener('submit', login);
   </script>
   <!-- Jivo widget -->
   <script src="//code.jivo.ru/widget/FaDWcuzcG6" async></script>

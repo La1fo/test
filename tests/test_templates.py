@@ -34,7 +34,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn('href="/logout"', nav)
 
     def test_pages_use_shared_nav_include(self):
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html", "map.html"]:
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]:
             self.assertIn('{% include "_nav.html" %}', self._read(file_name))
 
     def test_nav_has_add_location_link_on_key_pages(self):
@@ -42,18 +42,22 @@ class TestTemplates(unittest.TestCase):
         self.assertIn('href="/add-location"', nav)
         self.assertIn('href="/map"', nav)
 
-    def test_login_page_has_registration_block(self):
+    def test_login_and_register_are_separate_username_pages(self):
         login = self._read("login.html")
-        self.assertIn("Регистрация", login)
-        self.assertIn("regUsername", login)
-        self.assertIn("/api/session/register", login)
+        register = self._read("register.html")
+        self.assertIn("/api/session/login", login)
+        self.assertIn("/register", login)
+        self.assertIn("/api/session/register", register)
+        self.assertIn("regUsername", register)
+        self.assertNotIn("type=\"email\"", login)
+        self.assertNotIn("type=\"email\"", register)
         self.assertNotIn("Telegram", login)
         self.assertNotIn("/api/session/telegram", login)
 
     def test_logout_available_on_profile_page_only(self):
         profile = self._read("profile.html")
         self.assertIn("/logout?next=/", profile)
-        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "login.html", "add-location.html", "map.html"]:
+        for file_name in ["index.html", "achievements.html", "leaderboard.html", "faq.html", "login.html", "register.html", "add-location.html", "map.html"]:
             self.assertNotIn("/logout?next=/", self._read(file_name))
 
     def test_achievements_page_no_old_slogan(self):
@@ -75,7 +79,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("400+/400", leaderboard)
 
     def test_no_stale_support_blocks_on_user_pages(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html", "map.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]
         forbidden_tokens = ["chat-widget", "/api/support", "support-form", "support-block"]
         for file_name in pages:
             html = self._read(file_name)
@@ -103,6 +107,9 @@ class TestTemplates(unittest.TestCase):
     def test_jivo_script_present_on_login_page(self):
         self._assert_jivo_widget("login.html")
 
+    def test_jivo_script_present_on_register_page(self):
+        self._assert_jivo_widget("register.html")
+
     def test_jivo_script_present_on_add_location_page(self):
         self._assert_jivo_widget("add-location.html")
 
@@ -117,7 +124,7 @@ class TestTemplates(unittest.TestCase):
         self.assertNotIn("GP в текущем ранге", profile_template)
 
     def test_key_pages_have_basic_html_shell(self):
-        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "add-location.html", "map.html"]
+        pages = ["index.html", "achievements.html", "leaderboard.html", "faq.html", "profile.html", "login.html", "register.html", "add-location.html", "map.html"]
         for file_name in pages:
             html = self._read(file_name)
             self.assertIn("<body", html)
